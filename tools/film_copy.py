@@ -13,7 +13,7 @@ DIALOGUE = {
             "带着时间码改片",
         ],
         captions=[
-            "第 3–10 集共 150 条候选字幕。先听一句被杂音盖住的对白。",
+            "我把听写、切句和打时间码串起来，八集短剧交出 150 条候选字幕。",
             "BS-RoFormer 从这段原声里分出人声。留意句尾。",
             "这里听到的是后来录的配音。动作对齐，就能比较同一句。",
             "Apple M4 本机实测，三次取中位数。",
@@ -40,7 +40,7 @@ DIALOGUE = {
             "タイムコードで直す",
         ],
         captions=[
-            "第3〜10話で字幕の初稿は計150枚。まずは雑音に埋もれた一言を。",
+            "文字起こしから時間指定まで一括で進め、8話分の初稿150枚を作った。",
             "BS-RoFormerで元の音から声を抽出。語尾に注目。",
             "こちらは後日収録した声。同じ動きに合わせて聴き比べる。",
             "Apple M4で同じ素材を3回処理した中央値。",
@@ -67,7 +67,7 @@ DIALOGUE = {
             "Revise at the timecode",
         ],
         captions=[
-            "Episodes 3–10 yielded 150 draft cues. Listen for one line under the noise.",
+            "I batched transcription, cue splitting and timing. Eight episodes yielded 150 draft cues.",
             "BS-RoFormer isolates the voice. Listen for the last few words.",
             "This is a later voice recording, matched to the same movement.",
             "Three separate runs on an Apple M4. The time to first SRT is the median.",
