@@ -9,13 +9,14 @@ from array import array
 from functools import lru_cache
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
 ROOT = Path(__file__).resolve().parents[1]
 W, H, FPS = 960, 540, 24
 SHOT = 6
 INK, PAPER, BLUE, ORANGE, MUTED = '#171d28', '#f2eddf', '#a6bfff', '#ff925b', '#a4aea9'
 SAMPLE = ROOT / 'examples/speech/thanks.wav'
+REVIEW = ROOT / 'examples/speech/review'
 
 
 @lru_cache
@@ -66,7 +67,7 @@ def cover(peaks):
     d = ImageDraw.Draw(im)
     text(d,44,35,'EDIT  &  CODEX',24,BLUE)
     text(d,42,112,'对白与剪辑',91)
-    text(d,49,242,'短剧字幕   /   游戏广告',29)
+    text(d,49,242,'十集收音到审片字幕   /   游戏广告剪辑与补声',29)
     wave_plot(d, peaks,50,396,515,72,1)
     d.line((535,396,598,396,694,300,916,300),fill=BLUE,width=3)
     for j in range(3):
@@ -76,13 +77,19 @@ def cover(peaks):
 
 
 TITLES = {
-    'dialogue': ['演员这句说了什么？','一个词，整句意思变了','让字幕跟着开口出现'],
-    'edit': ['这句反应，应该放在哪？','等到出料，再说「做到了」','现有录音少了一句','只改开头，后面保留','同一句，换种念法','把导出的声音对回画面'],
+    'dialogue': ['十集，先出一版字幕','先听样片里的声音','再听同一句分离人声','把初稿打进画面','我看片，改这一句'],
+    'edit': ['同一条评论，什么时候看全？','等到出料，再说「做到了」','现有录音少了一句','只改开头，后面保留','同一句，换种念法','把导出的声音对回画面'],
 }
 CAPTIONS = {
-    'dialogue': ['先按原声起稿，把听不清的几秒留给我复听。','我逐字确认后，让 Codex 改回演员说的词。','换一段公开录音，看字幕怎样跟住声音。'],
-    'edit': ['我让 Codex 标出动作，再把演员的反应放上时间线。','42.83 秒还推不进。到 47.70 秒，成品才出来。','用获准的参考录音补一句日语。我先听同一个人怎么说话。','开头想再平一点。两条线取自实际试听文件的音高。','我喜欢 Qwen 的音色，也想保留 v5 的说话节奏。','回到剪辑案例，分轨修正后复测 40 个起音。'],
+    'dialogue': ['一次交给本机处理十集，我从第一版样片开始看。','《桜乱》审片片段，保留原有字幕、水印和声音。','同一段录音，经过 BS-RoFormer 分离后再听。','ASR 给出带时间的字幕，FFmpeg 压成可回看的样片。','我改回「会给你奖励」，再看它和前一句接得上吗。'],
+    'edit': ['截自同一支广告的两次导出。上面逐句换，下面一次读完。','42.83 秒还推不进。到 47.70 秒，成品才出来。','用获准的参考录音补一句日语。我先听同一个人怎么说话。','开头想再平一点。两条线取自实际试听文件的音高。','我喜欢 Qwen 的音色，也想保留 v5 的说话节奏。','回到剪辑案例，分轨修正后复测 40 个起音。'],
 }
+
+
+@lru_cache(maxsize=1)
+def comment_frames():
+    with Image.open(ROOT / 'examples/edit/comment-revision.gif') as animation:
+        return [frame.convert('RGB') for frame in ImageSequence.Iterator(animation)]
 
 
 def frame(kind, sec, peaks, pitch_data):
@@ -93,45 +100,40 @@ def frame(kind, sec, peaks, pitch_data):
     im = Image.new('RGB', (W,H), bg)
     d = ImageDraw.Draw(im)
     text(d,42,32,('日语对白复核' if speech else '游戏广告剪辑')+'   /   '+('0%d' % (part+1)),22,accent)
-    text(d,42,83,TITLES[kind][part],49,fg)
+    text(d,42,83,TITLES[kind][part],43 if speech else 49,fg)
     if speech and part == 0:
-        # Working transcript, reconstructed from the correction history.
-        text(d,47,195,'识别初稿',22,BLUE)
-        phrase='ごめん、やるから'
-        end=min(len(phrase),int(1+u*3.5))
-        text(d,47,251,phrase[:end],62)
-        x=49+d.textlength(phrase[:end],font=font(62))
-        d.rectangle((x+6,250,x+10,312),fill=ORANGE)
-        text(d,49,359,'这句听起来像「抱歉，我来做」。',28,MUTED)
-    elif speech and part == 1:
-        text(d,48,182,'初稿',23,BLUE)
-        text(d,149,175,'ごめん、やるから',43,MUTED)
-        d.line((148,199,148+ease(u/.9)*142,199),ORANGE,width=4)
-        offset=round(42*(1-ease((u-.6)/.9)))
-        if u>.6:
-            text(d,48,279,'复核',23,ORANGE)
-            text(d,149+offset,267,'ご褒美やるから',57)
-        if u>1.7: text(d,150,362,'「会给你奖励。」',30,BLUE)
+        text(d,45,172,'按集听写 · 本地识别',27,BLUE)
+        for i in range(10):
+            x = 47 + (i % 5) * 104
+            y = 236 + (i // 5) * 68
+            done = i <= int(u * 2.5)
+            d.rectangle((x,y,x+88,y+49),fill=BLUE if done else '#384150')
+            text(d,x+12,y+11,f'EP {i+1:02}',23,INK if done else MUTED)
+        text(d,47,401,'分集起稿 → 画面审片 → 标出难句',23)
+    elif speech and part in (1,2):
+        cleaned = part == 2
+        text(d,46,193,'02  人声轨' if cleaned else '01  样片原声',36,BLUE)
+        text(d,46,264,'减轻背景声，听低声的词尾。' if cleaned else '记住人物开口时的背景声。',27)
+        text(d,46,324,'原声留着，听不清就切回去。' if cleaned else '下一步会播放同一段对白。',25,MUTED)
+        d.line((47,403,47+480*min(1,u/4.8),403),BLUE,width=4)
+    elif speech and part == 3:
+        for i, (label,detail) in enumerate([
+            ('01   本地听写','按句输出起止时间'),
+            ('02   03.200 — 03.920','ご褒美やるから'),
+            ('03   FFmpeg','压出带字幕的审片副本')]):
+            y=174+i*85
+            text(d,46,y,label,28,BLUE if u > i*.8 else MUTED)
+            text(d,46,y+37,detail,21)
     elif speech:
-        start=2
-        p=max(0,min(1,(u-start)/1.301))
-        wave_plot(d,peaks,61,244,832,63,p)
-        line=61+p*832
-        d.line((line,163,line,323),ORANGE,width=3)
-        x0=61+832*.24/1.301
-        x1=61+832*1.12/1.301
-        d.rectangle((x0,326,x1,375),fill=BLUE if .24<=u-start<=1.12 else '#404a64')
-        text(d,x0+14,334,'ありがとう',28,INK if .24<=u-start<=1.12 else PAPER)
-        text(d,61,399,'字幕   00:00.240 — 00:01.120',23,BLUE)
+        text(d,47,177,'当时的初稿',23,BLUE)
+        text(d,47,214,'ごめん、やるから',41,MUTED)
+        d.line((47,237,47+130*ease(u/.8),237),ORANGE,width=3)
+        text(d,47,283,'我回听后改为',23,ORANGE)
+        text(d,47,322,'ご褒美やるから',46)
+        text(d,47,401,'「会给你奖励。」',26,BLUE)
     elif part == 0:
-        for i,(t,label) in enumerate([('36.37','烤好了'),('42.83','推不进'),('47.70','出料')]):
-            x=117+i*334
-            d.line((x,274,min(811,x+334),274),fill='#a7a298',width=3)
-            hit=ease((u-i*1.15)/.55)
-            r=7+hit*8
-            d.ellipse((x-r,274-r,x+r,274+r),fill=accent if hit else '#a7a298')
-            text(d,x-55,203,t,34,fg)
-            if hit: text(d,x-49,310+(1-hit)*15,label,31,accent)
+        samples = comment_frames()
+        im.paste(samples[min(int(u * 10), len(samples) - 1)], (72,161))
     elif part == 1:
         p=ease((u-.9)/2.4)
         d.line((95,339,813,339),fill=fg,width=5)
@@ -210,7 +212,38 @@ def render(out, kind, peaks, tmp, pitch_data):
     if kind=='edit':
         shutil.copyfile(silent,out/'edit.mp4')
     else:
-        subprocess.run(['ffmpeg','-loglevel','error','-y','-i',str(silent),'-i',str(SAMPLE),'-af','adelay=14000:all=1,apad','-t','18','-c:v','copy','-c:a','aac','-b:a','160k','-movflags','+faststart',str(out/'dialogue.mp4')],check=True)
+        # Repeat the same watermarked excerpt for the two listening passes.
+        # At other stages the portrait retains the original burned-in subtitles.
+        layout = (
+            '[1:v]fps=24,scale=230:410,setsar=1,tpad=stop_mode=clone:stop_duration=2,'
+            'trim=duration=6,loop=loop=4:size=144:start=0,setpts=N/(24*TB)[scene];'
+            '[0:v][scene]overlay=684:24:shortest=1[out]'
+        )
+        mix = tmp / 'listening-passes.wav'
+        # Place four non-overlapping listening passes on a fixed 30-second bed.
+        rate = 48000
+        bytes_per_frame = 4  # stereo signed 16-bit PCM
+        bed = bytearray(30 * rate * bytes_per_frame)
+        for source, starts in [('scene.mp4', (6, 18, 24)), ('voice.m4a', (12,))]:
+            pcm = subprocess.check_output(['ffmpeg','-loglevel','error','-i',str(REVIEW/source),
+                                           '-vn','-t','4.8','-ar',str(rate),'-ac','2','-f','s16le','-'])
+            for start in starts:
+                pos = start * rate * bytes_per_frame
+                bed[pos:pos+len(pcm)] = pcm
+        with wave.open(str(mix), 'wb') as output:
+            output.setparams((2, 2, rate, 0, 'NONE', 'not compressed'))
+            output.writeframes(bed)
+        target = out / 'dialogue.mp4'
+        subprocess.run(['ffmpeg','-loglevel','error','-y','-i',str(silent),
+                        '-i',str(REVIEW/'scene.mp4'),'-i',str(mix),
+                        '-filter_complex',layout,'-map','[out]','-map','2:a:0',
+                        '-t','30','-r',str(FPS),'-fps_mode','cfr','-c:v','libx264','-crf','18','-pix_fmt','yuv420p',
+                        '-c:a','aac','-b:a','160k','-movflags','+faststart',str(target)],check=True)
+        subprocess.run(['ffmpeg','-loglevel','error','-y','-ss','3.8','-i',str(target),
+                        '-frames:v','1',str(tmp/'poster.png')],check=True)
+        with Image.open(tmp/'poster.png') as poster:
+            poster.save(out/'dialogue.webp', quality=90)
+
 
 
 if __name__=='__main__':
