@@ -4,9 +4,9 @@
 
 ![同一场戏的两版画面并排播放，左边为 ACOPY，右边为配音审片](../examples/films/dialogue-preview.gif)
 
-[中文有声版 · 10 秒](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue.mp4) · [日本語版 · 10 秒](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue-ja.mp4)
+[中文有声版 · 15 秒](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue.mp4) · [日本語版 · 15 秒](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue-ja.mp4)
 
-前五秒听左边的 ACOPY，后五秒听右边的成片。两边的动作和切镜对齐。原片取自旧第 5 集的 27.0–31.8 秒，成片取自新版第 4 集的 32.8–37.6 秒。想单听从原片分离出的人声，可以[播放这段 4.8 秒的音轨](../examples/speech/review/acopy-voice.m4a)。
+先听左边的 ACOPY，再听从它分出的人声，最后听右边成片的后期配音。每段五秒。两边的动作和切镜对齐。原片取自旧第 5 集的 27.0–31.8 秒，成片取自新版第 4 集的 32.8–37.6 秒。想单听从原片分离出的人声，可以[播放这段 4.8 秒的音轨](../examples/speech/review/acopy-voice.m4a)。
 
 **为什么我会用这套流程。** 一次拿到十集，让人从头听、倒回去找词，再一句句打时间码，光做出第一版字幕就很费神。我在对话里指定集数，让本机先按集听写；遇到环境声盖过台词，再把原声和单独提取的人声来回听。字幕压进画面后，我能直接看片，把时间留给有疑问的句子。
 

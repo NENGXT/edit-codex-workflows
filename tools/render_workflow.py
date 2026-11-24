@@ -173,11 +173,12 @@ def render_edit(out, pitch_data):
         raise RuntimeError('FFmpeg encoding failed')
 
 
-def render_dialogue(out, tmp, stem, final_label):
+def render_dialogue(out, tmp, stem, final_label, captions):
     # The two portrait frames already share an aligned 540 × 480 canvas.
     headers = []
-    for active in range(2):
-        header = Image.new('RGB', (540, 48), INK)
+    for stage, caption in enumerate(captions):
+        active = int(stage == 2)
+        header = Image.new('RGB', (540, 86), INK)
         draw = ImageDraw.Draw(header)
         for index, label in enumerate(('ACOPY', final_label)):
             center = 135 + 270 * index
@@ -188,25 +189,29 @@ def render_dialogue(out, tmp, stem, final_label):
                 x = round(right) - 17
                 draw.polygon([(x,21),(x+4,21),(x+9,16),(x+9,32),(x+4,27),(x,27)], fill=BLUE)
                 draw.arc((x+2,17,x+16,31), -48, 48, fill=BLUE, width=2)
-        path = tmp / f'{stem}-{active}.png'
+        draw.text((270, 62), caption, font=font(22), anchor='mm', fill=PAPER)
+        path = tmp / f'{stem}-{stage}.png'
         header.save(path)
         headers.append(path)
 
-    # Play the same 4.8-second passage twice. Pad to five seconds so
+    # Play the same 4.8-second passage three times. Pad to five seconds so
     # the cut, the active speaker and the web chapter change together.
     layout = (
         '[0:v]fps=24,tpad=stop_mode=clone:stop_duration=1,trim=end_frame=120,'
-        'loop=loop=1:size=120:start=0,setpts=N/(24*TB),pad=540:528:0:48[v];'
-        '[v][2:v]overlay=0:0[first];'
-        "[first][3:v]overlay=0:0:enable='gte(t,5)'[video];"
+        'loop=loop=2:size=120:start=0,setpts=N/(24*TB),pad=540:566:0:86[v];'
+        '[v][3:v]overlay=0:0[first];'
+        "[first][4:v]overlay=0:0:enable='gte(t,5)'[second];"
+        "[second][5:v]overlay=0:0:enable='gte(t,10)'[video];"
         '[0:a]aresample=48000,atrim=end=4.8,apad,atrim=end=5,asetpts=PTS-STARTPTS[raw];'
         '[1:a]aresample=48000,atrim=end=4.8,apad,atrim=end=5,asetpts=PTS-STARTPTS[final];'
-        '[raw][final]concat=n=2:v=0:a=1[audio]'
+        '[2:a]aresample=48000,atrim=end=4.8,apad,atrim=end=5,asetpts=PTS-STARTPTS[voice];'
+        '[raw][voice][final]concat=n=3:v=0:a=1[audio]'
     )
     movie = out / f'{stem}.mp4'
     subprocess.run(['ffmpeg','-v','error','-y','-i',str(REVIEW/'comparison.mp4'),
-                    '-i',str(REVIEW/'scene.mp4'),'-i',str(headers[0]),'-i',str(headers[1]),
-                    '-filter_complex',layout,'-map','[video]','-map','[audio]','-t','10',
+                    '-i',str(REVIEW/'scene.mp4'),'-i',str(REVIEW/'acopy-voice.m4a'),
+                    '-i',str(headers[0]),'-i',str(headers[1]),'-i',str(headers[2]),
+                    '-filter_complex',layout,'-map','[video]','-map','[audio]','-t','15',
                     '-c:v','libx264','-crf','18','-pix_fmt','yuv420p','-c:a','aac',
                     '-b:a','160k','-movflags','+faststart',str(movie)],check=True)
     still = tmp / f'{stem}-poster.png'
@@ -227,6 +232,14 @@ if __name__=='__main__':
     cover(peaks).save(args.output/'cover.webp',quality=93)
     pitch_data=json.loads((ROOT/'examples/edit/intonation.json').read_text())
     with tempfile.TemporaryDirectory() as tmp:
-        render_dialogue(args.output, Path(tmp), 'dialogue', '成片')
-        render_dialogue(args.output, Path(tmp), 'dialogue-ja', '完成版')
+        render_dialogue(args.output, Path(tmp), 'dialogue', '成片', (
+            '杂音盖住了句尾。你听得清吗？',
+            '分出人声，AI 先听写，我再逐句校对。',
+            '同一句台词，听听后期配音。',
+        ))
+        render_dialogue(args.output, Path(tmp), 'dialogue-ja', '完成版', (
+            '雑音に埋もれた語尾、聞き取れますか？',
+            '声を分離し、AIの書き起こしを耳で確かめる。',
+            '同じセリフを、今度はアフレコで。',
+        ))
     render_edit(args.output, pitch_data)
