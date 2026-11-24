@@ -1,7 +1,6 @@
 """Render the public cover and two short motion studies. Requires Pillow and FFmpeg."""
 import argparse
 import json
-import shutil
 import subprocess
 import tempfile
 import wave
@@ -76,14 +75,8 @@ def cover(peaks):
     return im
 
 
-TITLES = {
-    'dialogue': ['先听现场收音','再听分离的人声','最后听配音版','十集，先出字幕初稿','模型听出了哪几个字？','我回听，把词改回来'],
-    'edit': ['同一条评论，什么时候看全？','等到出料，再说「做到了」','现有录音少了一句','只改开头，后面保留','同一句，换种念法','把导出的声音对回画面'],
-}
-CAPTIONS = {
-    'dialogue': ['左边是飞书 ACOPY 原片，右边是后期配音审片。现在听左边。','同一段现场收音，经 BS-RoFormer 分出人声，再听一次。','现在听右边。后期重新配过音，画面保留审片水印。','模型先逐集听写。FFmpeg 压出带字幕的副本，我再看片。','同一个模型听两条现场音轨，两次都没认出「ご褒美」。','「ご褒美」是奖励。这一句要靠人回听，再对上下文。'],
-    'edit': ['截自同一支广告的两次导出。上面逐句换，下面一次读完。','42.83 秒还推不进。到 47.70 秒，成品才出来。','用获准的参考录音补一句日语。我先听同一个人怎么说话。','开头想再平一点。两条线取自实际试听文件的音高。','我喜欢 Qwen 的音色，也想保留 v5 的说话节奏。','回到剪辑案例，分轨修正后复测 40 个起音。'],
-}
+EDIT_TITLES = ['同一条评论，什么时候看全？','等到出料，再说「做到了」','现有录音少了一句','只改开头，后面保留','同一句，换种念法','把导出的声音对回画面']
+EDIT_CAPTIONS = ['截自同一支广告的两次导出。上面逐句换，下面一次读完。','42.83 秒还推不进。到 47.70 秒，成品才出来。','用获准的参考录音补一句日语。我先听同一个人怎么说话。','开头想再平一点。两条线取自实际试听文件的音高。','我喜欢 Qwen 的音色，也想保留 v5 的说话节奏。','回到剪辑案例，分轨修正后复测 40 个起音。']
 
 
 @lru_cache(maxsize=1)
@@ -92,43 +85,15 @@ def comment_frames():
         return [frame.convert('RGB') for frame in ImageSequence.Iterator(animation)]
 
 
-def frame(kind, sec, peaks, pitch_data):
-    part = min(len(TITLES[kind])-1, int(sec / SHOT))
+def edit_frame(sec, pitch_data):
+    part = min(len(EDIT_TITLES)-1, int(sec / SHOT))
     u = sec - part * SHOT
-    speech = kind == 'dialogue'
-    bg, fg, accent = (INK, PAPER, BLUE) if speech else (PAPER, INK, '#b54520')
+    bg, fg, accent = PAPER, INK, '#b54520'
     im = Image.new('RGB', (W,H), bg)
     d = ImageDraw.Draw(im)
-    text(d,42,32,('日语对白复核' if speech else '游戏广告剪辑')+'   /   '+('0%d' % (part+1)),22,accent)
-    text(d,42,83,TITLES[kind][part],43 if speech else 49,fg)
-    if speech and part < 3:
-        left = part != 2
-        text(d,486,47,'A COPY  ·  现场',22,BLUE if left else MUTED)
-        text(d,707,47,'审片  ·  配音',22,ORANGE if not left else MUTED)
-        text(d,48,200,['旧第 5 集  /  7 月 19 日','从 A COPY 中提取','新版第 4 集  /  带水印'][part],23,MUTED)
-        text(d,48,255,['听演员当场说的话。','保留现场的说话节奏。','听同一句的后期配音。'][part],25)
-        text(d,48,320,['27.0 — 31.8 秒','BS-RoFormer','32.8 — 37.6 秒'][part],24,BLUE if left else ORANGE)
-        d.line((48,406,48+335*min(1,u/4.8),406),BLUE if left else ORANGE,width=4)
-    elif speech and part == 3:
-        for idx,(task,tool) in enumerate([
-            ('按集起第一稿','Whisper large-v3'),
-            ('分出人声，复听难句','BS-RoFormer / Qwen3-ASR'),
-            ('对时间，压审片字幕','ForcedAligner / FFmpeg')]):
-            y=181+idx*77
-            text(d,46,y,task,29,PAPER if u >= idx*.8 else MUTED)
-            text(d,456,y,tool,29,BLUE if u >= idx*.8 else MUTED)
-    elif speech and part == 4:
-        text(d,46,176,'本次重听  /  Qwen3-ASR',24,BLUE)
-        for idx,(source,result) in enumerate([('A COPY 现场声','拷問あるか'),('分离后的人声','ごめんあるから')]):
-            y=250+idx*88
-            text(d,46,y,source,28,MUTED)
-            text(d,461,y,result,35,PAPER if u >= idx*.7 else MUTED)
-    elif speech:
-        text(d,47,177,'8 月 25 日版本的听写批注',23,BLUE)
-        text(d,47,220,'ごめん、やるから',38,MUTED)
-        text(d,47,305,'我确认的台词',22,ORANGE)
-        text(d,47,350,'手を貸せ。ご褒美やるから。',44)
-    elif part == 0:
+    text(d,42,32,'游戏广告剪辑'+'   /   '+('0%d' % (part+1)),22,accent)
+    text(d,42,83,EDIT_TITLES[part],49,fg)
+    if part == 0:
         samples = comment_frames()
         im.paste(samples[min(int(u * 10), len(samples) - 1)], (72,161))
     elif part == 1:
@@ -187,59 +152,68 @@ def frame(kind, sec, peaks, pitch_data):
             text(d,750,y+12,('+' if p<1 else '')+str(round(ms*(1-p)))+' ms',24,fg)
         text(d,47,400,'复测范围   36 处对白  +  4 处尾卡',22,accent)
     d.line((42,452,918,452),fill='#747c82',width=1)
-    text(d,44,476,CAPTIONS[kind][part],24,fg)
+    text(d,44,476,EDIT_CAPTIONS[part],24,fg)
     return im
 
 
-def render(out, kind, peaks, tmp, pitch_data):
-    silent=tmp/(kind+'.mp4')
+def render_edit(out, pitch_data):
+    silent=out/'edit.mp4'
     cmd=['ffmpeg','-hide_banner','-loglevel','error','-y','-f','rawvideo','-pix_fmt','rgb24','-s','960x540','-r',str(FPS),'-i','-','-an','-c:v','libx264','-preset','veryfast','-crf','19','-pix_fmt','yuv420p','-movflags','+faststart',str(silent)]
     proc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
     try:
-        for i in range(SHOT*len(TITLES[kind])*FPS):
-            im=frame(kind,i/FPS,peaks,pitch_data)
+        for i in range(SHOT*len(EDIT_TITLES)*FPS):
+            im=edit_frame(i/FPS,pitch_data)
             if i==int(2.8*FPS):
-                im.save(out/(kind+'.webp'),quality=90)
+                im.save(out/'edit.webp',quality=90)
             proc.stdin.write(im.tobytes())
     finally:
         proc.stdin.close()
         result=proc.wait()
     if result:
         raise RuntimeError('FFmpeg encoding failed')
-    if kind=='edit':
-        shutil.copyfile(silent,out/'edit.mp4')
-    else:
-        # Both versions start together. Only the listening track changes.
-        layout = (
-            '[1:v]fps=24,scale=432:384,setsar=1,tpad=stop_mode=clone:stop_duration=2,'
-            'trim=duration=6,loop=loop=2:size=144:start=0,setpts=N/(24*TB)[pair];'
-            "[0:v][pair]overlay=484:69:enable='lt(t,18)':eof_action=pass[out]"
-        )
-        mix = tmp / 'listening-passes.wav'
-        duration = SHOT * len(TITLES[kind])
-        rate = 48000
-        bytes_per_frame = 4  # stereo signed 16-bit PCM
-        bed = bytearray(duration * rate * bytes_per_frame)
-        for source, starts in [('comparison.mp4', (0,)), ('acopy-voice.m4a', (6,)), ('scene.mp4', (12,))]:
-            pcm = subprocess.check_output(['ffmpeg','-loglevel','error','-i',str(REVIEW/source),
-                                           '-vn','-t','4.8','-ar',str(rate),'-ac','2','-f','s16le','-'])
-            for start in starts:
-                pos = start * rate * bytes_per_frame
-                bed[pos:pos+len(pcm)] = pcm
-        with wave.open(str(mix), 'wb') as output:
-            output.setparams((2, 2, rate, 0, 'NONE', 'not compressed'))
-            output.writeframes(bed)
-        target = out / 'dialogue.mp4'
-        subprocess.run(['ffmpeg','-loglevel','error','-y','-i',str(silent),
-                        '-i',str(REVIEW/'comparison.mp4'),'-i',str(mix),
-                        '-filter_complex',layout,'-map','[out]','-map','2:a:0',
-                        '-t',str(duration),'-r',str(FPS),'-fps_mode','cfr','-c:v','libx264','-crf','18','-pix_fmt','yuv420p',
-                        '-c:a','aac','-b:a','160k','-movflags','+faststart',str(target)],check=True)
-        subprocess.run(['ffmpeg','-loglevel','error','-y','-ss','3.8','-i',str(target),
-                        '-frames:v','1',str(tmp/'poster.png')],check=True)
-        with Image.open(tmp/'poster.png') as poster:
-            poster.save(out/'dialogue.webp', quality=90)
 
+
+def render_dialogue(out, tmp, stem, final_label):
+    # The two portrait frames already share an aligned 540 × 480 canvas.
+    headers = []
+    for active in range(2):
+        header = Image.new('RGB', (540, 48), INK)
+        draw = ImageDraw.Draw(header)
+        for index, label in enumerate(('ACOPY', final_label)):
+            center = 135 + 270 * index
+            draw.text((center, 24), label, font=font(22), anchor='mm',
+                      fill=PAPER if active == index else MUTED)
+            if active == index:
+                right = center - draw.textlength(label, font=font(22)) / 2 - 9
+                x = round(right) - 17
+                draw.polygon([(x,21),(x+4,21),(x+9,16),(x+9,32),(x+4,27),(x,27)], fill=BLUE)
+                draw.arc((x+2,17,x+16,31), -48, 48, fill=BLUE, width=2)
+        path = tmp / f'{stem}-{active}.png'
+        header.save(path)
+        headers.append(path)
+
+    # Play the same 4.8-second passage twice. Pad to five seconds so
+    # the cut, the active speaker and the web chapter change together.
+    layout = (
+        '[0:v]fps=24,tpad=stop_mode=clone:stop_duration=1,trim=end_frame=120,'
+        'loop=loop=1:size=120:start=0,setpts=N/(24*TB),pad=540:528:0:48[v];'
+        '[v][2:v]overlay=0:0[first];'
+        "[first][3:v]overlay=0:0:enable='gte(t,5)'[video];"
+        '[0:a]aresample=48000,atrim=end=4.8,apad,atrim=end=5,asetpts=PTS-STARTPTS[raw];'
+        '[1:a]aresample=48000,atrim=end=4.8,apad,atrim=end=5,asetpts=PTS-STARTPTS[final];'
+        '[raw][final]concat=n=2:v=0:a=1[audio]'
+    )
+    movie = out / f'{stem}.mp4'
+    subprocess.run(['ffmpeg','-v','error','-y','-i',str(REVIEW/'comparison.mp4'),
+                    '-i',str(REVIEW/'scene.mp4'),'-i',str(headers[0]),'-i',str(headers[1]),
+                    '-filter_complex',layout,'-map','[video]','-map','[audio]','-t','10',
+                    '-c:v','libx264','-crf','18','-pix_fmt','yuv420p','-c:a','aac',
+                    '-b:a','160k','-movflags','+faststart',str(movie)],check=True)
+    still = tmp / f'{stem}-poster.png'
+    subprocess.run(['ffmpeg','-v','error','-y','-ss','1','-i',str(movie),
+                    '-frames:v','1',str(still)],check=True)
+    with Image.open(still) as poster:
+        poster.save(out / f'{stem}.webp', quality=90)
 
 
 if __name__=='__main__':
@@ -253,5 +227,6 @@ if __name__=='__main__':
     cover(peaks).save(args.output/'cover.webp',quality=93)
     pitch_data=json.loads((ROOT/'examples/edit/intonation.json').read_text())
     with tempfile.TemporaryDirectory() as tmp:
-        for kind in TITLES:
-            render(args.output,kind,peaks,Path(tmp),pitch_data)
+        render_dialogue(args.output, Path(tmp), 'dialogue', '成片')
+        render_dialogue(args.output, Path(tmp), 'dialogue-ja', '完成版')
+    render_edit(args.output, pitch_data)
