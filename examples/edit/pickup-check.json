@@ -1,0 +1,13 @@
+{
+  "duration_seconds": 8.48,
+  "sample_rate_hz": 48000,
+  "bits_per_sample": 16,
+  "channels": 1,
+  "comparison_from_seconds": 2.16,
+  "tail_seconds": 6.32,
+  "tail_frames": 303360,
+  "opening_differs": true,
+  "tail_matches": true,
+  "before_tail_sha256": "632dcb4a0822ae18ee1f3f169d3a4ff03e901fde7559b2307188db073ae6f83c",
+  "after_tail_sha256": "632dcb4a0822ae18ee1f3f169d3a4ff03e901fde7559b2307188db073ae6f83c"
+}

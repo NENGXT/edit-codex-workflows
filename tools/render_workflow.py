@@ -1,269 +1,432 @@
-"""Render the public cover and two short motion studies. Requires Pillow and FFmpeg."""
+"""Render the cover and both case films from released extracts and production measurements."""
+
 import argparse
 import json
+import math
 import subprocess
 import tempfile
-import wave
 from array import array
 from functools import lru_cache
 from pathlib import Path
+from statistics import median
 
-from PIL import Image, ImageDraw, ImageFont, ImageSequence
+from PIL import Image, ImageDraw, ImageFont
+
+from film_copy import DIALOGUE, EDIT
 
 ROOT = Path(__file__).resolve().parents[1]
-W, H, FPS = 960, 540, 24
-SHOT = 6
-INK, PAPER, BLUE, ORANGE, MUTED = '#171d28', '#f2eddf', '#a6bfff', '#ff925b', '#a4aea9'
-SAMPLE = ROOT / 'examples/speech/thanks.wav'
-REVIEW = ROOT / 'examples/speech/review'
+REVIEW = ROOT / "examples/speech/review"
+AD = ROOT / "examples/edit"
+W, H, FPS, SHOT = 960, 540, 24, 6
+INK, WHITE, BLUE, GOLD = "#151c26", "#f3f0e6", "#a8c4ff", "#ffab72"
+MUTED, RULE, LIGHT, RUST = "#adb7c6", "#485569", "#ded8c9", "#993f20"
+CJK_FONT = None
 
 
-@lru_cache
-def font(size):
-    for path in (FONT, '/System/Library/Fonts/Hiragino Sans GB.ttc', 'NotoSansCJK-Regular.ttc'):
-        if path:
-            try:
-                return ImageFont.truetype(str(path), size)
-            except OSError:
-                pass
-    raise RuntimeError('Supply a Chinese and Japanese font with --font')
+@lru_cache(maxsize=140)
+def face(size, numeric=False):
+    paths = (["/System/Library/Fonts/Supplemental/DIN Alternate Bold.ttf"] if numeric else []) + [
+        CJK_FONT,
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "NotoSansCJK-Regular.ttc",
+    ]
+    for path in filter(None, paths):
+        try:
+            return ImageFont.truetype(str(path), size)
+        except OSError:
+            continue
+    raise RuntimeError("Provide a Chinese/Japanese font with --font.")
 
 
-def text(d, x, y, s, size, color=PAPER):
-    d.text((round(x), round(y)), s, font=font(size), fill=color, anchor='lt')
+def label(d, xy, value, size, color=WHITE, limit=None, numeric=False):
+    while limit and size > 12 and d.textlength(value, font=face(size, numeric)) > limit:
+        size -= 1
+    d.text(xy, value, fill=color, font=face(size, numeric), anchor="lt")
 
 
-def ease(t):
-    t = max(0, min(1, t))
-    return t * t * (3 - 2 * t)
+def caption(d, value, color, line_color):
+    d.line((36, 417, 924, 417), fill=line_color, width=1)
+    # Keep captions above the area covered by native playback controls.
+    english = value.isascii() or (" " in value and value[0].isascii() and "。" not in value)
+    words = value.split() if english else list(value)
+    joiner = " " if english else ""
+    lines, line = [], ""
+    for word in words:
+        candidate = joiner.join(filter(None, [line, word]))
+        if line and d.textlength(candidate, font=face(25)) > 885:
+            lines.append(line)
+            line = word
+        else:
+            line = candidate
+    lines.append(line)
+    if len(lines) > 3:
+        raise ValueError(f"Caption exceeds frame: {value}")
+    for i, row in enumerate(lines):
+        label(d, (36, 435 + 33 * i), row, 25, color)
 
 
-def wave_peaks():
-    with wave.open(str(SAMPLE)) as f:
-        assert f.getsampwidth() == 2
-        pcm = array('h', f.readframes(f.getnframes()))[::f.getnchannels()]
-    n = 146
-    values = [max(abs(x) for x in pcm[i*len(pcm)//n:(i+1)*len(pcm)//n]) for i in range(n)]
-    return [v / max(values) for v in values]
+def intro(d, series, title, part, light=False):
+    base, accent = (INK, RUST) if light else (WHITE, BLUE)
+    label(d, (36, 25), series, 22, accent)
+    label(d, (838, 24), f"{part + 1:02} / 06", 21, base, numeric=True)
+    label(d, (34, 68), title, 48, base, 887)
 
 
-def wave_plot(d, peaks, x, y, width, height, progress):
-    for i, value in enumerate(peaks):
-        a = x + i * width / len(peaks)
-        h = max(2, value * height)
-        d.line((a, y-h, a, y+h), BLUE if i/len(peaks) <= progress else '#697384', width=3)
+def ff(*args):
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", *map(str, args)], check=True)
 
 
-def tile(d, x, y, size, depth, color):
-    top = [(x-size,y), (x,y-size*.45), (x+size,y), (x,y+size*.45)]
-    for a,b,shade in [(top[0],top[3],'#bc613d'),(top[3],top[2],'#793f32')]:
-        d.polygon([a,b,(b[0],b[1]+depth),(a[0],a[1]+depth)],fill=shade)
-    d.polygon(top, fill=color)
+@lru_cache(maxsize=4)
+def samples(path, width, height, limit):
+    data = subprocess.check_output(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-an",
+            "-vf",
+            f"fps={FPS},scale={width}:{height}",
+            "-frames:v",
+            str(limit),
+            "-pix_fmt",
+            "rgb24",
+            "-f",
+            "rawvideo",
+            "-",
+        ]
+    )
+    stride = width * height * 3
+    if not data or len(data) % stride:
+        raise ValueError(f"Incomplete RGB frames in {path.name}")
+    return [
+        Image.frombytes("RGB", (width, height), data[i : i + stride]) for i in range(0, len(data), stride)
+    ]
 
 
-def cover(peaks):
-    im = Image.new('RGB', (W,H), INK)
-    d = ImageDraw.Draw(im)
-    text(d,44,35,'EDIT  &  CODEX',24,BLUE)
-    text(d,42,112,'对白与剪辑',91)
-    text(d,49,242,'十集收音到审片字幕   /   游戏广告剪辑与补声',29)
-    wave_plot(d, peaks,50,396,515,72,1)
-    d.line((535,396,598,396,694,300,916,300),fill=BLUE,width=3)
-    for j in range(3):
-        tile(d,662+j*84,367-j*43,49,25,ORANGE)
-    d.line((48,497,910,497),fill='#525d6e',width=1)
-    return im
+@lru_cache(maxsize=3)
+def envelope(path):
+    data = subprocess.check_output(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-t",
+            "4.8",
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-f",
+            "s16le",
+            "-",
+        ]
+    )
+    pcm = array("h", data)
+    count = 92
+    peaks = [
+        math.sqrt(
+            sum(v * v for v in pcm[i * len(pcm) // count : (i + 1) * len(pcm) // count])
+            / (len(pcm) // count)
+        )
+        for i in range(count)
+    ]
+    return peaks
 
 
-EDIT_TITLES = ['同一条评论，什么时候看全？','等到出料，再说「做到了」','现有录音少了一句','只改开头，后面保留','同一句，换种念法','把导出的声音对回画面']
-EDIT_CAPTIONS = ['截自同一支广告的两次导出。上面逐句换，下面一次读完。','42.83 秒还推不进。到 47.70 秒，成品才出来。','用获准的参考录音补一句日语。我先听同一个人怎么说话。','开头想再平一点。两条线取自实际试听文件的音高。','我喜欢 Qwen 的音色，也想保留 v5 的说话节奏。','回到剪辑案例，分轨修正后复测 40 个起音。']
+def waveform(d, values, x, y, width, height, progress, color):
+    for i, v in enumerate(values):
+        head = x + i * width / len(values)
+        extent = max(1, height * v)
+        d.line(
+            (head, y - extent, head, y + extent),
+            fill=color if i / len(values) <= progress else RULE,
+            width=2,
+        )
+
+
+BENCH = json.loads((REVIEW / "benchmark.json").read_text())
+PITCH = json.loads((AD / "intonation.json").read_text())
+EVENTS = json.loads((AD / "events.json").read_text())
+VOICE_TRACKS = [REVIEW / "comparison.mp4", REVIEW / "acopy-voice.m4a", REVIEW / "scene.mp4"]
 
 
 @lru_cache(maxsize=1)
-def comment_frames():
-    with Image.open(ROOT / 'examples/edit/comment-revision.gif') as animation:
-        return [frame.convert('RGB') for frame in ImageSequence.Iterator(animation)]
+def listening_peaks():
+    tracks = json.loads((REVIEW / "listening.json").read_text())["tracks"]
+    rows = [
+        [value * 10 ** (track["playback_gain_db"] / 20) for value in envelope(path)]
+        for path, track in zip(VOICE_TRACKS, tracks)
+    ]
+    ceiling = max(max(row) for row in rows)
+    return [[value / ceiling for value in row] for row in rows]
 
 
-def edit_frame(sec, pitch_data):
-    part = min(len(EDIT_TITLES)-1, int(sec / SHOT))
-    u = sec - part * SHOT
-    bg, fg, accent = PAPER, INK, '#b54520'
-    im = Image.new('RGB', (W,H), bg)
+def dialogue_frame(second, lang):
+    c = DIALOGUE[lang]
+    part, local = divmod(second, SHOT)
+    i = int(part)
+    im = Image.new("RGB", (W, H), INK)
     d = ImageDraw.Draw(im)
-    text(d,42,32,'游戏广告剪辑'+'   /   '+('0%d' % (part+1)),22,accent)
-    text(d,42,83,EDIT_TITLES[part],49,fg)
-    if part == 0:
-        samples = comment_frames()
-        im.paste(samples[min(int(u * 10), len(samples) - 1)], (72,161))
-    elif part == 1:
-        p=ease((u-.9)/2.4)
-        d.line((95,339,813,339),fill=fg,width=5)
-        for j in range(20):
-            x=97+j*35
-            d.line((x,341,x-10,358),fill='#bcb5a6',width=3)
-        tile(d,197+477*p,295,51,24,ORANGE)
-        text(d,67,177,'42.83 s',28,fg)
-        text(d,639,177,'47.70 s',28,fg)
-        if p>=.99:
-            text(d,607,218,'できた！',44,accent)
-        text(d,69,392,'按剪点记录重绘',19,fg)
-    elif part == 2:
-        text(d,47,171,'GPT-SoVITS v5 Turbo   /   同一句追加口播',24,fg)
-        for i,(name,seconds) in enumerate([('用片头语气',7.44),('换片尾直视镜头的语气',8.48)]):
-            y=242+i*87
-            text(d,47,y,name,26,fg)
-            d.line((390,y+14,390+45*seconds*ease((u-i*.85)/1.5),y+14),fill=accent,width=10)
-            text(d,797,y,'%.2f s' % seconds,25,fg)
-        text(d,48,397,'台词和语速设置保持一致，只更换参考录音。',23,fg)
-    elif part == 3:
-        for i,(key,name) in enumerate([('before','调整前'),('after','调整后')]):
-            y=231+i*95
-            text(d,45,y-15,name,26,fg)
-            d.line((194,y,887,y),fill='#b5ada0')
-            points=pitch_data[key]
-            last=None
-            for j,v in enumerate(points):
-                x=201+j*19
-                if v is None or j/(len(points)-1)>min(1,u/2.16):
-                    last=None
-                    continue
-                point=(x,y-v*4.1)
-                if last: d.line([last,point],fill=accent if i else fg,width=4)
-                last=point
-        text(d,48,397,'只动开头 2.16 秒，后面的声音逐采样相同。',23,fg)
-    elif part == 4:
-        for i,(name,seconds) in enumerate([('旧 Qwen',2.50),('v5 语气示范',1.88),('新版 Qwen',1.94)]):
-            y=192+70*i
-            text(d,47,y,name,26,fg)
-            x=295+175*seconds*ease((u-.35*i)/1.7)
-            d.line((295,y+15,x,y+15),fill=accent if i==2 else '#6f766e',width=7)
-            text(d,788,y,'%.2f s' % seconds,25,fg)
-        text(d,47,400,'从开口到第一次明显停顿',23,fg)
+    if i < 3:
+        label(d, (36, 26), c["series"], 22, BLUE)
+        label(d, (36, 102), c["titles"][i], 47, WHITE, 322)
+        label(d, (36, 185), ["ACOPY", "BS-RoFormer", "POST / ADR"][i], 28, GOLD if i == 2 else BLUE, 320)
+        u = min(1, local / 4.8)
+        waveform(d, listening_peaks()[i], 36, 283, 313, 51, u, GOLD if i == 2 else BLUE)
+        label(d, (36, 355), c["trace"], 19, MUTED, 172)
+        label(d, (226, 354), f"{min(local, 4.8):04.1f} / 4.8 s", 20, MUTED, numeric=True)
+        frames = samples(VOICE_TRACKS[0], 406, 360, 116)
+        im.paste(frames[min(int(local * FPS), len(frames) - 1)], (496, 47))
+        # Original and dub use the same cut; accent is a listening cue.
+        for j, name in enumerate(["ACOPY", c["dub"]]):
+            x = 496 + 203 * j
+            col = (GOLD if i == 2 else BLUE) if j == int(i == 2) else MUTED
+            label(d, (x, 16), name, 20, col, 197)
+            d.rectangle((x, 402, x + 202, 406), fill=col if j == int(i == 2) else RULE)
     else:
-        p=ease((u-1.5)/2.2)
-        for i,(name,ms) in enumerate([('主对白',88),('尾卡',44)]):
-            y=236+i*99
-            text(d,44,y-14,name,27,fg)
-            d.line((250,y,860,y),fill='#b3afa3',width=3)
-            d.line((300,y-25,300,y+25),fill=fg,width=3)
-            x=300+(1-p)*ms*5
-            d.ellipse((x-10,y-10,x+10,y+10),fill=accent)
-            text(d,750,y+12,('+' if p<1 else '')+str(round(ms*(1-p)))+' ms',24,fg)
-        text(d,47,400,'复测范围   36 处对白  +  4 处尾卡',22,accent)
-    d.line((42,452,918,452),fill='#747c82',width=1)
-    text(d,44,476,EDIT_CAPTIONS[part],24,fg)
+        intro(d, c["series"], c["titles"][i], i)
+        if i == 3:
+            for x, key, value, col in [
+                (36, "duration", BENCH["source_seconds"], WHITE),
+                (485, "elapsed", median(BENCH["runs_seconds"]), BLUE),
+            ]:
+                label(d, (x, 153), c[key], 21, MUTED)
+                label(d, (x, 187), f"{value:.2f} s", 62, col, numeric=True)
+            d.line((39, 302, 918, 302), fill=RULE, width=1)
+            for start, end in BENCH["cue_intervals_seconds"]:
+                x = 39 + 879 * start / BENCH["source_seconds"]
+                endx = 39 + 879 * end / BENCH["source_seconds"]
+                if local / 3.3 >= start / BENCH["source_seconds"]:
+                    d.rectangle((x, 285, endx - 1, 319), fill=BLUE)
+            label(d, (36, 356), f"{BENCH['cue_count']}  {c['cues']}", 27)
+            label(d, (528, 358), c["batch"], 22, BLUE, 394)
+        elif i == 4:
+            for row, reading in enumerate(["拷問あるか", "ごめんあるから"]):
+                y = 167 + row * 107
+                label(d, (37, y), c["tracks"][row], 23, MUTED, 262)
+                d.line((300, y + 12, 355, y + 12), fill=RULE, width=2)
+                label(d, (383, y - 5), reading, 39, BLUE if row else WHITE)
+            label(d, (37, 366), "Qwen3-ASR   /   27.0–31.8 s", 22, MUTED)
+        else:
+            for row, reading in enumerate(["ごめん、やるから", "手を貸せ。ご褒美やるから。"]):
+                y = 170 + row * 110
+                label(d, (37, y), c["versions"][row], 23, MUTED, 252)
+                label(d, (311, y - 4), reading, 44, GOLD if row else MUTED, 600)
+            d.line((310, 238, 620, 238), fill=RULE, width=1)
+            label(d, (36, 365), "SRT   →   FFmpeg   →   MP4", 22, BLUE)
+    caption(d, c["captions"][i], WHITE, RULE)
     return im
 
 
-def render_slides(silent, shots, frame, poster=None):
-    cmd=['ffmpeg','-hide_banner','-loglevel','error','-y','-f','rawvideo','-pix_fmt','rgb24','-s','960x540','-r',str(FPS),'-i','-','-an','-c:v','libx264','-preset','veryfast','-crf','19','-pix_fmt','yuv420p','-movflags','+faststart',str(silent)]
-    proc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
+def edit_frame(second, lang):
+    c = EDIT[lang]
+    part, local = divmod(second, SHOT)
+    i = int(part)
+    im = Image.new("RGB", (W, H), WHITE)
+    d = ImageDraw.Draw(im)
+    intro(d, c["series"] if i < 3 else c["pickup"], c["titles"][i], i, True)
+    progress = min(1, local / 2.2)
+    if i == 0:
+        frames = samples(ROOT / "examples/films/comment-comparison.mp4", 960, 540, 96)
+        frame = frames[min(int(local * FPS), len(frames) - 1)]
+        for version, box, y, height in [
+            ("V3", (137, 33, 912, 166), 129, 102),
+            ("V4", (137, 301, 912, 514), 239, 164),
+        ]:
+            label(
+                d, (48, y + height // 2 - 18), version, 35, INK if version == "V3" else RUST, numeric=True
+            )
+            im.paste(frame.crop(box).resize((596, height), Image.Resampling.LANCZOS), (202, y))
+    elif i == 1:
+        for j, ((when, _), event) in enumerate(zip(EVENTS, c["events"])):
+            x = 38 + j * 297
+            active = local >= j * 1.5
+            col = RUST if active else "#777a78"
+            label(d, (x, 179), f"{when} s", 45, col, 279, True)
+            d.line((x, 277, x + 274, 277), fill=col, width=4 if active else 1)
+            d.ellipse((x, 271, x + 12, 283), fill=col)
+            label(d, (x, 312), event, 28, INK, 278)
+        label(d, (37, 376), c["eventlog"], 19, RUST)
+    elif i == 2:
+        for j, (name, ms) in enumerate(zip(c["sync"], [88, 44])):
+            y = 178 + j * 102
+            label(d, (36, y), name, 24, INK, 190)
+            label(d, (255, y - 8), f"+{ms} ms", 43, INK, 221, True)
+            d.line((478, y + 19, 736, y + 19), fill="#aba69b", width=3)
+            x = 478 + ms * 2.55 * (1 - progress)
+            d.ellipse((x - 7, y + 11, x + 8, y + 27), fill=RUST)
+            label(d, (783, y - 8), "0 ms" if progress == 1 else "…", 42, RUST, numeric=True)
+        label(d, (38, 371), f"36 + 4   /   {c['after']}", 24, RUST)
+    elif i in (3, 5):
+        labels = c["refs"] if i == 3 else c["pause"]
+        values = [7.44, 8.48] if i == 3 else [2.50, 1.88, 1.94]
+        scale = 44 if i == 3 else 165
+        for j, (name, val) in enumerate(zip(labels, values)):
+            y = 164 + (95 if i == 3 else 64) * j
+            label(d, (36, y + 2), name, 22, INK, 245)
+            d.rectangle(
+                (314, y + 9, 314 + scale * val * min(1, max(0, (local - j * 0.17) / 1.45)), y + 20),
+                fill=RUST if j == len(labels) - 1 else "#7e827d",
+            )
+            label(d, (776, y - 4), f"{val:.2f} s", 30, INK, numeric=True)
+        label(d, (37, 373), "GPT-SoVITS v5 Turbo" if i == 3 else c["interval"], 22, RUST)
+    else:
+        for j, key in enumerate(("before", "after")):
+            y = 201 + j * 78
+            label(d, (36, y - 22), c["pitch"][j], 22, INK, 190)
+            d.line((233, y, 906, y), fill=LIGHT, width=1)
+            previous = None
+            for n, v in enumerate(PITCH[key]):
+                if v is None or n * PITCH["window_seconds"] > min(local, 2.16):
+                    previous = None
+                    continue
+                pt = (235 + n * 18, y - v * 2.3)
+                if previous:
+                    d.line([previous, pt], fill=RUST if j else INK, width=4)
+                previous = pt
+        d.rectangle((37, 348, 257, 361), fill=RUST)
+        d.rectangle((260, 348, 918, 361), fill="#909b95")
+        label(d, (37, 373), "2.16 s", 21, RUST, numeric=True)
+        label(d, (307, 372), f"6.32 s   /   {c['tail']}", 22, INK)
+    caption(d, c["captions"][i], INK, "#aaa598")
+    return im
+
+
+def render(stage, frame, lang, poster):
+    proc = subprocess.Popen(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            f"{W}x{H}",
+            "-r",
+            str(FPS),
+            "-i",
+            "-",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            str(stage),
+        ],
+        stdin=subprocess.PIPE,
+    )
     try:
-        for i in range(SHOT*shots*FPS):
-            im=frame(i/FPS)
-            if poster and i==int(2.8*FPS):
-                im.save(poster,quality=90)
+        for n in range(6 * SHOT * FPS):
+            im = frame(n / FPS, lang)
+            if n == int(2.8 * FPS):
+                im.save(poster, quality=92)
             proc.stdin.write(im.tobytes())
     finally:
         proc.stdin.close()
-        result=proc.wait()
-    if result:
-        raise RuntimeError('FFmpeg encoding failed')
+        status = proc.wait()
+    if status:
+        raise RuntimeError("FFmpeg encoding failed")
 
 
-DIALOGUE = {
-    'dialogue': {
-        'series': '短剧字幕', 'final': '成片',
-        'titles': ('听原声', '分出人声', '听成片', '十集，先出一稿', 'AI 听成了什么？', '我回听，改回台词'),
-        'captions': ('噪声盖住了这句台词的结尾。', '同一句，再听一次。', '这里听到的是后期配音。',
-                     '字幕压进画面，我边看边校。', '两次听写，都漏了「ご褒美」。', '「ご褒美」是“奖励”。'),
-        'steps': ('逐集听写', '难句复听', '压入字幕'),
-        'sources': ('原声', '分离人声'), 'revisions': ('字幕初稿', '校对后'),
-    },
-    'dialogue-ja': {
-        'series': '短編ドラマの字幕', 'final': '完成版',
-        'titles': ('元の音を聴く', '声を取り出す', '完成版を聴く', '全10話の字幕を起こす', 'AIにはどう聞こえた？', '聞き直して字幕を直す'),
-        'captions': ('雑音でセリフの語尾が聞き取りにくい。', '声だけで、同じセリフをもう一度。', '完成版ではアフレコに切り替わる。',
-                     '字幕を焼き込み、映像を見ながら確かめる。', 'どちらも「ご褒美」を聞き取れなかった。', '前後のやりとりも聞いて、言葉を確かめる。'),
-        'steps': ('各話を書き起こす', '難所を聞き直す', '字幕を焼き込む'),
-        'sources': ('元の音声', '分離した声'), 'revisions': ('字幕の初稿', '修正後'),
-    },
-}
-
-
-def dialogue_frame(sec, copy):
-    part = int(sec // SHOT)
-    elapsed = sec % SHOT
-    image = Image.new('RGB', (W, H), INK)
-    draw = ImageDraw.Draw(image)
-    text(draw, 42, 32, f"{copy['series']}   /   {part + 1:02}", 22, BLUE)
-    text(draw, 42, 180 if part < 3 else 83, copy['titles'][part], 45)
-    if part < 3:
-        color = ORANGE if part == 2 else BLUE
-        text(draw, 484, 38, 'ACOPY', 24, MUTED if part == 2 else BLUE)
-        text(draw, 700, 38, copy['final'], 24, ORANGE if part == 2 else MUTED)
-        draw.line((46, 280, 380, 280), fill='#4c5667', width=3)
-        draw.line((46, 280, 46 + 334 * min(elapsed / 4.8, 1), 280), fill=color, width=4)
-    elif part == 3:
-        for i, (label, tool) in enumerate(zip(copy['steps'], ('Whisper', 'BS-RoFormer / Qwen3-ASR', 'FFmpeg'))):
-            y = 181 + i * 80
-            text(draw, 46, y, label, 31, PAPER if elapsed >= i*.8 else MUTED)
-            text(draw, 455, y, tool, 29, BLUE if elapsed >= i*.8 else MUTED)
-    elif part == 4:
-        for i, (label, result) in enumerate(zip(copy['sources'], ('拷問あるか', 'ごめんあるから'))):
-            y = 210 + i * 95
-            text(draw, 46, y, label, 28, MUTED)
-            text(draw, 420, y, result, 38, PAPER if elapsed >= i*.8 else MUTED)
-    else:
-        text(draw, 46, 190, copy['revisions'][0], 24, MUTED)
-        text(draw, 46, 230, 'ごめん、やるから', 36, MUTED)
-        if elapsed >= .8:
-            text(draw, 46, 310, copy['revisions'][1], 24, ORANGE)
-            text(draw, 46, 350, '手を貸せ。ご褒美やるから。', 44)
-    draw.line((42, 452, 918, 452), fill='#747c82', width=1)
-    text(draw, 44, 476, copy['captions'][part], 26)
-    return image
-
-
-def render_dialogue(out, tmp, stem, copy):
-    silent = tmp / 'slides.mp4'
-    render_slides(silent, len(copy['titles']), lambda sec: dialogue_frame(sec, copy))
-    # The same two shots stay in sync through the three listening passes.
-    layout = (
-        '[1:v]fps=24,scale=432:384,setsar=1,tpad=stop_mode=clone:stop_duration=2,'
-        'trim=end_frame=144,loop=loop=2:size=144:start=0,setpts=N/(24*TB)[pair];'
-        "[0:v][pair]overlay=484:68:enable='lt(t,18)':eof_action=pass[video];"
-        '[1:a]aresample=48000,atrim=end=4.8,apad,atrim=end=6,asetpts=PTS-STARTPTS[raw];'
-        '[2:a]aresample=48000,atrim=end=4.8,apad,atrim=end=6,asetpts=PTS-STARTPTS[voice];'
-        '[3:a]aresample=48000,atrim=end=4.8,apad,atrim=end=6,asetpts=PTS-STARTPTS[dub];'
-        '[raw][voice][dub]concat=n=3:v=0:a=1,apad[audio]'
+def preview(movie, output):
+    # Give GitHub readers a short silent preview in their chosen language.
+    cuts = "+".join(f"between(t,{start},{end})" for start, end in [(1, 3), (7, 9), (20, 22), (32, 34)])
+    graph = (
+        f"fps=8,select='{cuts}',setpts=N/(8*TB),scale=576:-2:flags=lanczos,"
+        "split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer"
     )
-    movie = out / f'{stem}.mp4'
-    subprocess.run(['ffmpeg','-v','error','-y','-i',str(silent),'-i',str(REVIEW/'comparison.mp4'),
-                    '-i',str(REVIEW/'acopy-voice.m4a'),'-i',str(REVIEW/'scene.mp4'),
-                    '-filter_complex',layout,'-map','[video]','-map','[audio]','-t',str(SHOT * len(copy['titles'])),
-                    '-c:v','libx264','-crf','18','-pix_fmt','yuv420p','-c:a','aac',
-                    '-b:a','160k','-movflags','+faststart',str(movie)],check=True)
-    still = tmp / 'poster.png'
-    subprocess.run(['ffmpeg','-v','error','-y','-ss','3.8','-i',str(movie),
-                    '-frames:v','1',str(still)],check=True)
-    with Image.open(still) as poster:
-        poster.save(out / f'{stem}.webp', quality=90)
+    ff("-i", movie, "-an", "-filter_complex", graph, "-loop", "0", output)
 
 
-if __name__=='__main__':
-    parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('output',type=Path)
-    parser.add_argument('--font',help='Path to a Chinese/Japanese TrueType or OpenType font')
-    args=parser.parse_args()
-    FONT=args.font
-    args.output.mkdir(parents=True,exist_ok=True)
-    peaks=wave_peaks()
-    cover(peaks).save(args.output/'cover.webp',quality=93)
-    pitch_data=json.loads((ROOT/'examples/edit/intonation.json').read_text())
-    with tempfile.TemporaryDirectory() as tmp:
-        for stem, copy in DIALOGUE.items():
-            render_dialogue(args.output, Path(tmp), stem, copy)
-    render_slides(args.output/'edit.mp4', len(EDIT_TITLES),
-                  lambda sec: edit_frame(sec, pitch_data), args.output/'edit.webp')
+def cover(output):
+    im = Image.new("RGB", (W, H), INK)
+    d = ImageDraw.Draw(im)
+    label(d, (37, 33), "KUMA TSU   /   POST-PRODUCTION", 21, BLUE)
+    label(d, (34, 135), "对白与剪辑", 73, WHITE, 440)
+    label(d, (37, 241), "DIALOGUE  /  EDIT", 31, BLUE, numeric=True)
+    dialogue = samples(VOICE_TRACKS[0], 406, 360, 116)[57]
+    label(d, (512, 34), "ACOPY   /   ADR", 20, BLUE, numeric=True)
+    im.paste(dialogue.crop((0, 46, 406, 239)), (512, 70))
+    comment = samples(ROOT / "examples/films/comment-comparison.mp4", 960, 540, 96)[57]
+    label(d, (512, 277), "COMMENT   /   V4", 20, GOLD, numeric=True)
+    card = comment.crop((137, 301, 912, 514))
+    im.paste(card.resize((406, 112), Image.Resampling.LANCZOS), (512, 310))
+    waveform(d, listening_peaks()[0], 38, 367, 410, 47, 0.68, BLUE)
+    d.line((37, 451, 920, 451), fill=RULE, width=1)
+    label(d, (37, 475), "短剧字幕", 24, WHITE)
+    label(d, (510, 475), "游戏广告剪辑与补声", 24, GOLD)
+    im.save(output, quality=94)
+
+
+def main():
+    global CJK_FONT
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("output", type=Path)
+    p.add_argument("--font")
+    p.add_argument("--language", choices=list(DIALOGUE), action="append")
+    args = p.parse_args()
+    CJK_FONT = args.font
+    args.output.mkdir(exist_ok=True, parents=True)
+    cover(args.output / "cover.webp")
+    with tempfile.TemporaryDirectory() as directory:
+        stage = Path(directory) / "silent.mp4"
+        for lang in args.language or DIALOGUE:
+            suffix = "" if lang == "zh" else "-" + lang
+            render(stage, dialogue_frame, lang, args.output / f"dialogue{suffix}.webp")
+            levels = json.loads((REVIEW / "listening.json").read_text())["tracks"]
+            filters = ";".join(
+                f"[{i + 1}:a]aresample=48000,aformat=channel_layouts=stereo,volume={levels[i]['playback_gain_db']}dB,atrim=end=4.8,apad,atrim=end=6,asetpts=PTS-STARTPTS[a{i}]"
+                for i in range(3)
+            )
+            ff(
+                "-i",
+                stage,
+                "-i",
+                VOICE_TRACKS[0],
+                "-i",
+                VOICE_TRACKS[1],
+                "-i",
+                VOICE_TRACKS[2],
+                "-filter_complex",
+                filters + ";[a0][a1][a2]concat=n=3:v=0:a=1,apad[a]",
+                "-map",
+                "0:v",
+                "-map",
+                "[a]",
+                "-t",
+                "36",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "160k",
+                "-movflags",
+                "+faststart",
+                args.output / f"dialogue{suffix}.mp4",
+            )
+            preview(args.output / f"dialogue{suffix}.mp4", args.output / f"dialogue-preview{suffix}.gif")
+            render(
+                args.output / f"edit{suffix}.mp4", edit_frame, lang, args.output / f"edit{suffix}.webp"
+            )
+
+
+if __name__ == "__main__":
+    main()

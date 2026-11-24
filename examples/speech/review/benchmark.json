@@ -1,0 +1,59 @@
+{
+  "source": "ACOPY, one complete source file",
+  "source_seconds": 43.209833,
+  "machine": "Apple M4",
+  "model": "mlx-community/whisper-large-v3-mlx",
+  "model_revision": "49e6aa286ad60c14352c404340ded53710378a11",
+  "language": "ja",
+  "timed_stage": "import, local model loading, media decode, Japanese transcription and writing SRT; fresh Python process per run, model already downloaded",
+  "runs_seconds": [
+    10.192,
+    10.629,
+    9.873
+  ],
+  "median_seconds": 10.192,
+  "cue_count": 10,
+  "cue_intervals_seconds": [
+    [
+      0.0,
+      2.0
+    ],
+    [
+      2.0,
+      4.0
+    ],
+    [
+      4.0,
+      6.0
+    ],
+    [
+      6.0,
+      8.0
+    ],
+    [
+      20.0,
+      22.0
+    ],
+    [
+      22.0,
+      26.0
+    ],
+    [
+      27.0,
+      29.0
+    ],
+    [
+      29.0,
+      31.0
+    ],
+    [
+      31.0,
+      31.5
+    ],
+    [
+      36.5,
+      37.5
+    ]
+  ],
+  "scope": "Single-file throughput. Human editing, review and source separation are outside this timing."
+}

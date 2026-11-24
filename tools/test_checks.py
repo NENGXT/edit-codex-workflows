@@ -59,6 +59,23 @@ class DeliveryChecks(unittest.TestCase):
         tone = self.audio("tone.wav", np.sin(2*np.pi*500*np.arange(RATE*2)/RATE)*.2)
         self.assertIsNone(self.sync(tone, tone, .5, 2)["offset_ms"])
 
+    def test_pickup_edit_stops_at_named_sample(self):
+        before = self.root / "before.wav"
+        after = self.root / "after.wav"
+        length = 2 * RATE
+        x = np.zeros(length, dtype=np.int16)
+        write(before, RATE, x)
+        x[RATE - 1] = 500
+        write(after, RATE, x)
+        result = self.check("check_pickup.py", 0, before, after, "--from-seconds", 1)
+        self.assertTrue(result["opening_differs"])
+        self.assertEqual(result["tail_frames"], RATE)
+        self.assertTrue(result["tail_matches"])
+        x[RATE] = 1
+        write(after, RATE, x)
+        result = self.check("check_pickup.py", 1, before, after, "--from-seconds", 1)
+        self.assertFalse(result["tail_matches"])
+
     def test_missing_picture_tail(self):
         path = self.root / "short-picture.mp4"
         subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-f", "lavfi", "-i",

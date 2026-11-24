@@ -1,0 +1,22 @@
+{
+  "window_seconds": 4.8,
+  "target_lufs": -22.4,
+  "tracks": [
+    {
+      "name": "location",
+      "input_lufs": -22.4,
+      "playback_gain_db": 0.0
+    },
+    {
+      "name": "isolated",
+      "input_lufs": -24.4,
+      "playback_gain_db": 2.0
+    },
+    {
+      "name": "later_dub",
+      "input_lufs": -19.1,
+      "playback_gain_db": -3.3
+    }
+  ],
+  "method": "One constant gain per excerpt, measured in stereo. No dynamic compression or normalization of the source files."
+}

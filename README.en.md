@@ -1,29 +1,27 @@
-# Dialogue and editing
+# Dialogue & edit
 
 [中文](README.md) · [日本語](README.ja.md) · English
 
-On a ten-episode Japanese drama, I spent hours rewinding noisy location recordings and typing dialogue onto an empty timeline. I now give the chat assistant a batch of episodes and have local speech models make a first subtitle pass. I watch the cut with those subtitles burned in, then go back to the lines and timings that need a second listen.
+![A location-sound waveform, two versions of the same shot, and the revised game-ad comment](examples/films/cover.webp)
 
-| Case | What to look for |
-| --- | --- |
-| [Subtitling a short drama](docs/dialogue.en.md) | Hear one line as recorded, with the voice isolated, and in the later dub. The 36-second film follows a misheard word through to the subtitle I corrected. |
-| [Editing a game ad](docs/edit.en.md) | Compare the same four seconds of the opening comment in V3 and V4. The editing walkthrough also covers reaction timing and a voice pickup for a separate ad. [Play the four-second comparison](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/comment-comparison.mp4) |
+Ten minutes of Japanese drama can mean finding the start and end of more than a hundred subtitle cues. I built a workflow in Codex for the repeated work of locating speech, drafting text and laying it on a timeline. These two case studies follow the material through actual edits and measurements.
 
-The [round-by-round production notes (Chinese)](docs/conversations.md) trace what I asked for in chat, what changed in the next cut, and what I still had to check by ear.
+### Drama | From location recordings to an editable subtitle track
 
-## Run the examples
+For episodes 3–10 of *Sakura Ran* (桜乱), seven source files covered **10 min 46 s and yielded 150 draft cues**. I ran transcription, segmentation and timing locally. When a voice disappeared under location noise, I lined up two tracks at the same cut. The editor could jump to that line and change its wording or timing.
 
-Install Python and FFmpeg, including ffprobe, then run these commands from the repository root.
+I also repeated the draft stage on a separate **43.21 s** ACOPY source. On an Apple M4, three fresh runs each wrote the same ten timed cues, in a median of **10.19 s**. [Watch the 36-second English film](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue-en.mp4) · [Compare the recordings](docs/dialogue.en.md) · [Production counts](examples/speech/review/production.csv) · [Timing results](examples/speech/review/benchmark.json)
 
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -r requirements.txt
-python tools/test_checks.py
-python tools/draw_plates.py out/plates
-python tools/render_workflow.py out/films
-```
+### Advertising | Turning “that reaction comes too early” into a cut
 
-The first script tests audio offsets, duplicated audio and picture ending early. The other two generate the illustrations and walkthrough films. The film renderer needs a font with Chinese and Japanese glyphs. Pass its path with `--font` if needed.
+In a *Whiteout Survival* ad the machine is still blocked at 42.83 s. Its first item comes out at 47.70 s, so that is where I put the actor’s “I did it!” I then measured the export: dialogue was about **88 ms** late, the end card about **44 ms** late. I corrected them separately and retested **40 onsets**.
 
-[Subtitle tools and models](models/README.md) · [Production tools](docs/production.md) · [Example chat requests](prompts/README.md) · [Practice audio credits](examples/speech/CREDITS.md)
+![The same opening comment in V3 and V4. V3 replaces each line as it is read. V4 shows the whole question at once.](examples/edit/comment-revision.gif)
+
+A separate ad needed a Japanese voice pickup. With permission to clone the speaker’s voice, I auditioned different deliveries of the same line. For one revision I asked to flatten just the opening of an 8.48 s take. Its final **6.32 s matched the previous take sample for sample**. [Watch the 36-second English film](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit-en.mp4) · [See the edit and voice decisions](docs/edit.en.md)
+
+### Follow the work
+
+The [drama notes](docs/dialogue.en.md) and [ad notes](docs/edit.en.md) follow each request through to the next revision. [Inside the edit session](docs/conversations.en.md) reconstructs my instructions, the output and what I decided to change in the next round.
+
+[Subtitle models and benchmark](models/README.md) · [Production tools and film rendering](docs/production.md) · [Example edit instructions](prompts/README.md) · [Practice recording credits](examples/speech/CREDITS.md)

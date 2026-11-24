@@ -1,42 +1,55 @@
-# 广告剪辑 · 从第一次看片到三种画幅
+# 游戏广告｜把改片意见对到画面，把声音对回剪点
 
-中文 · [日本語](edit.ja.md) · [English](edit.en.md)
+中文 · [日本語](edit.ja.md) · [English](edit.en.md) · [返回首页](../README.md)
 
-[播放开场评论对比 · 4 秒，无声](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/comment-comparison.mp4)
+[播放 36 秒中文解说](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit.mp4) · [日本語](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit-ja.mp4) · [English](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit-en.mp4)
 
-![同一条开场评论在 V3 和 V4 竖版里的真实画面对照](../examples/edit/comment-revision.gif)
+**先看开场的同一秒。** 演员正要回应观众的一条评论。V3 跟着说话一行行换，读到第三行时第一行已经没了。我让 Codex 在 ChatCut 里改成 V4 的完整评论卡。观众可以先读问题，再看他怎么回答。下图直接截自两版竖屏导出。
 
-**先看上面的评论框。** 同一段开场，V3 跟着演员一行一行换，看完最后一句就看不到第一句。返修时，我让 Codex 在 ChatCut 里把开头改回一张完整的评论卡。V4 弹出来就能读完三行，后面的对白字幕仍然一次一行。动图取自两次竖版导出的相同时间，只截取开头的评论区域。
+![V3和V4的真实评论卡按同一帧比较](../examples/edit/comment-revision.gif)
 
-[下载 36 秒制作演示](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit.mp4) · [逐轮复盘](conversations.md#游戏广告剪辑)
+[播放原画面对比 · 4 秒，无声](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/comment-comparison.mp4)
 
-## 把反应放回游戏里
+## 我给动作定剪点
 
-开剪先核对脚本版本和素材。逐句选表演，也看机位、手势、收音和尾部余量。在 ChatCut 里把游戏、人物小窗、对白、游戏声、字幕、音乐和尾卡分轨。锁定某句的反应时，把嘴型、起音和字幕一起看。
+游戏画面、演员、对白、字幕和尾卡分轨保留。我要改反应时，就能挪动那句声音和表演，保留游戏动作的先后。
 
-| 成片时间 | 画面与反应 |
-| --- | --- |
-| 36.37 s | 食物烤好，接上「うわ、すげえ！」 |
-| 42.83 s | 发现东西还推不进去，保留等待 |
-| 47.70 s | 升级出料，接「できた！」 |
+| 《Whiteout Survival》成片时间 | 我看到的动作 | 我的剪辑决定 |
+| --- | --- | --- |
+| 36.37 s | 食物烤好 | 在这一下接「うわ、すげえ！」 |
+| 42.83 s | 东西还推不进 | 留住卡顿，观众先看到他遇到什么问题 |
+| 47.70 s | 升级后第一次出料 | 这时才接「できた！」 |
 
-首轮导出的对白约晚 88 ms，尾卡约晚 44 ms。按两种偏移分别校正，再测 36 处对白和 4 处尾卡起音。那次交接记录的 40 个测点均为 0 ms。这些数值只适用于那条片。
+[三个原始剪点](../examples/edit/events.json)
 
-复现检查时用自己的文件。从工程同一段音轨取清楚、独特的起音；下例的数字仅示范命令参数。
+## 导出后，我怎么知道改准了
+
+| 改片意见 | 我让工具检查什么 | 制作记录里的结果 |
+| --- | --- | --- |
+| 对白听起来晚了 | 分别测主对白和尾卡的起音 | 两轨各晚约 88 ms、44 ms。分轨修正后，36 处对白和 4 处尾卡的起音偏移均为 0 ms |
+| 20.5 秒这一张字卡太小 | 修改前后比对全部 47 张字幕卡 | 点名的卡片字号从 42 改为 74，其余 46 张一致 |
+| 同一支片交三种画幅 | 分别检查竖版、横版、4:5 的游戏画面、小窗、尾卡和时长 | 三个画幅各 1,976 帧，计 65.87 秒，使用同一条确认过的混音 |
+
+我又从 V3 和三个 V4 交付档里单独取出 AAC 音轨，四份数据的 SHA-256 完全相同。[三个画幅的核验记录](../examples/edit/deliveries.json)
+
+40 处是这次导出的测点数。47 张是另一次字号返修的检查范围。两件事都能看出，给一句反馈之后，我怎样控制下一版究竟动了哪里。
+
+## 另一次广告｜现有录音少了一句
+
+我从获准使用的本人录音里选了两个参考片段。同一句日语、同一个 GPT-SoVITS v5 Turbo 设置，看片头说话的方式做出 7.44 秒，换成直视镜头的片尾语气是 8.48 秒。这样可以先试两种表演，判断哪种放进广告比较自然。
+
+下一轮，我想把开头的抑扬收一点。两份 8.48 秒的试听中，**改动落在前 2.16 秒，后 6.32 秒的 303,360 个采样逐个相同**。动画的两条音高线取自试听文件，分段窗长 60 毫秒，测不到可靠音高的位置留空。[实际音高数据](../examples/edit/intonation.json) · [保留段的比对结果](../examples/edit/pickup-check.json)
+
+我后来喜欢上 v5 Dev 的停顿，又更喜欢 Qwen 的音色。把 v5 的读法给 Qwen 作示范后，从开口到第一次明显停顿，旧版是 2.50 秒，示范是 1.88 秒，新版是 1.94 秒。制作记录止于试听导出。[五轮选音与改法](conversations.md#广告追加口播)
+
+## 检查自己的导出
+
+选一个在成片中容易辨认的起音。下例用自己的素材路径和时间替换参数。
 
 ```sh
 python tools/check_sync.py voice.wav export.mp4 --reference-at 1.2 --output-at 11.2
 python tools/check_export.py export.mp4 --size 1080x1920
+python tools/check_pickup.py first.wav revised.wav --from-seconds 2.16
 ```
 
-正偏移表示声音晚到。重复节拍和静音窗口可能无法唯一匹配，工具用退出码 2 提醒复听。导出检查会核对音画流边界并完整解码。最终还要用正常速度播放反应前后几秒。
-
-## 同一支片怎样交三个尺寸
-
-竖版确认后，我又看了一遍横版和 4:5。横屏能留出真人镜头两侧的环境，游戏段要能看清右上角的人物反应。每种画幅都换用对应尺寸的游戏画面和尾卡，再调整花字、小窗和标志的位置。最终三种画幅均保留 65.87 秒，含 4 秒尾卡。
-
-## 另一次广告补声
-
-另一个广告的录音少了一段日语。我先用同一位说话者的两段参考录音，各做一条试听。换成片尾直视镜头时的语气，同一句从 7.44 秒变成了 8.48 秒。下一轮我只提一个地方：开头念平一点。第 18 秒的动画把修改前后的音高叠到同一把尺上。
-
-后面才是选模型。我喜欢 GPT-SoVITS v5 Dev 的停顿，也喜欢 Qwen 的音色，就让 Qwen 参照前者的节奏再读一遍。这里记录到试听导出。[看五轮试听怎样取舍](conversations.md#广告追加口播) · [看两版音高数据](../examples/edit/intonation.json)
+第一条报告声音相对预期位置的偏移，正值表示晚到。静音和重复节拍难以唯一定位，需换一个测点。第二条检查音画长度和解码。第三条比较两份等长 PCM WAV，打印指定位置之后的采样数和校验值。发行声道和音画偏移仍应在成片上检查。

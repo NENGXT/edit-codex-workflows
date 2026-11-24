@@ -1,0 +1,42 @@
+{
+  "audio": "AAC, 48000 Hz, stereo",
+  "method": "ffprobe stream metadata; FFmpeg -map 0:a:0 -c copy -f hash -hash sha256 -",
+  "exports": [
+    {
+      "revision": "V3",
+      "width": 1080,
+      "height": 1920,
+      "video_frames": 1976,
+      "frame_rate": "30/1",
+      "video_seconds": 65.866667,
+      "aac_payload_sha256": "3829a3024e35301d7f585947cf33979b7e183c3bc417f56cbb7ca08f5d001d68"
+    },
+    {
+      "revision": "V4",
+      "width": 864,
+      "height": 1080,
+      "video_frames": 1976,
+      "frame_rate": "30/1",
+      "video_seconds": 65.866667,
+      "aac_payload_sha256": "3829a3024e35301d7f585947cf33979b7e183c3bc417f56cbb7ca08f5d001d68"
+    },
+    {
+      "revision": "V4",
+      "width": 1920,
+      "height": 1080,
+      "video_frames": 1976,
+      "frame_rate": "30/1",
+      "video_seconds": 65.866667,
+      "aac_payload_sha256": "3829a3024e35301d7f585947cf33979b7e183c3bc417f56cbb7ca08f5d001d68"
+    },
+    {
+      "revision": "V4",
+      "width": 1080,
+      "height": 1920,
+      "video_frames": 1976,
+      "frame_rate": "30/1",
+      "video_seconds": 65.866667,
+      "aac_payload_sha256": "3829a3024e35301d7f585947cf33979b7e183c3bc417f56cbb7ca08f5d001d68"
+    }
+  ]
+}

@@ -2,43 +2,33 @@
 
 中文 · [日本語](README.ja.md) · [English](README.en.md)
 
-![对白与剪辑，蓝色声波接入橙色剪辑分镜](examples/films/cover.webp)
+![对白与剪辑。现场声波、短剧的同帧对照，以及游戏广告改过的评论卡。](examples/films/cover.webp)
 
-剪十集日语短剧，最耗神的是一边倒带听现场收音，一边把每句对白敲到时间线上。我让对话助手调用本机模型先出字幕，压出样片，自己看片改词。剪游戏广告时，我也在对话里指出具体的镜头、停顿和读法，再看下一版到底改对了没有。
+做日语短剧，十来分钟素材也能拆出上百处对白。最花时间的是来回倒片、找每一句的头尾，再把它放进剪辑时间线。我在 Codex 里把这些动作接了起来。下面两个案例都有实际用过的素材、修改前后和测量记录。
 
-**[读完整的对话复盘](docs/conversations.md)**。从第一份稿、我指出的具体问题，一直写到下一版改了什么，以及哪些地方仍然要回听。
+### 短剧｜从一批现场录音，到剪辑师能用的字幕轨
 
-| 子项目 | 动画里可以看到什么 |
+《桜乱》第 3–10 集的 7 份原片，合计 **10 分 46 秒、150 条候选字幕**。我先让本机按集听写、切句、打时间码。遇到收音差的段落，我留下原声，另分一轨人声，再把两份听写放回同一镜头。剪辑师可以点到争议的那一句，直接改词和入点。
+
+**单段测速**取了另一份 43.21 秒的未处理 ACOPY。在 Apple M4 上，三次独立运行都写出相同的 10 条 SRT，中位用时 **10.19 秒**。[看 36 秒有声解说](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue.mp4) · [按镜头听对比](docs/dialogue.md) · [逐集数量](examples/speech/review/production.csv) · [三次实测](examples/speech/review/benchmark.json)
+
+### 广告｜从「这一句接早了」，到一个可以复查的剪点
+
+《Whiteout Survival》的游戏里，42.83 秒东西还推不进，47.70 秒才第一次出料。我把演员的「できた！」放在出料那一刻。导出后，我又把对白和尾卡拆开量，分别修掉约 **88 ms 和 44 ms** 的延迟，再复测 **40 个起音**。
+
+![同一帧的两张评论卡。V3 只显示演员正在读的一行；V4 在开头就展示完整问题。](examples/edit/comment-revision.gif)
+
+另一个广告缺录了一句日语。我用获准的参考录音做克隆试听，让同一句分别按两种语气来读。后来我只想把开头念平一点。两份 8.48 秒的试听从 2.16 秒起，后面 **6.32 秒逐采样一致**。[看 36 秒剪辑与补声解说](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit.mp4) · [看剪点和试听数据](docs/edit.md)
+
+### 看我是怎么一轮轮做的
+
+[制作对话复盘](docs/conversations.md)把一轮请求、产出和下一轮修改放在一起。比如开场的评论卡一开始会逐句消失，我怎么说，改完哪一秒能看到区别。对话按原记录重述，表格和音高数据可以单独核对。
+
+| 想复现哪一步 | 从这里开始 |
 | --- | --- |
-| [短剧素材与审片字幕 · 36 秒](docs/dialogue.md) | 先听同一句台词的三个版本，再看十集字幕怎么起稿，以及我怎样改回一个听错的词。收录中、日两版。 |
-| [广告剪辑与补声 · 36 秒](docs/edit.md) | [先看 4 秒原片对比](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/comment-comparison.mp4)。同一条开场评论，V3 逐句换，V4 三行一起出现。接着看游戏的反应剪点，以及另一条广告怎样补录日语。 |
+| 给自己的素材出一份日语字幕，测到落盘要多久 | [模型与实测方法](models/README.md) |
+| 检查成片的声音偏移、画面长度和解码 | [剪辑案例里的检查命令](docs/edit.md#检查自己的导出) |
+| 按项目改写对话指令、交接下一位剪辑师 | [制作指令](prompts/README.md) · [交接清单](templates/handoff.md) |
+| 生成这里的封面和三语动画 | [制作工具与运行方法](docs/production.md) |
 
-如果只看一个细节，可以从广告动画的 **第 18 秒**开始。两条音高线取自真实的调整前后录音。我要求「开头平一点」，两版都保留了 2.16 秒之后的原有声音。[查看两版数据](examples/edit/intonation.json)
-
-## 自己跑一次
-
-| 你想做什么 | 从哪儿开始 | 会得到什么 |
-| --- | --- | --- |
-| 在 Mac 上给样音配字幕 | [本地模型与命令](models/README.md) | 一份 SRT 字幕和带时间的识别结果 |
-| 检查自己的成片 | [剪辑记录里的两条检查命令](docs/edit.md) | 声音偏移量、音画时长及解码结果 |
-| 用 Codex 做类似的制作任务 | [对话指令](prompts/README.md) · [交接表](templates/handoff.md) | 可以按自己项目改写的指令和交付清单 |
-
-<details>
-<summary>运行检查示例、生成演示插图</summary>
-
-安装 Python 和 FFmpeg（含 ffprobe），在仓库目录运行以下命令。
-
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -r requirements.txt
-python tools/test_checks.py
-python tools/draw_plates.py out/plates
-python tools/render_workflow.py out/films
-```
-
-检查脚本会生成临时音视频，测试声音偏移、重复声音和画面提前结束的情况。插图脚本用公开样音和剪点记录生成六张图，写入 `out/plates`。最后一个命令用样片节选、人声轨、音高数据和剪点生成封面、短剧对照的中日两版和一段广告演示，需要能显示中文和日文的字体；可以用 `--font` 指定字体文件。
-
-</details>
-
-字幕压制、配音试听和调色交接的工具收在[制作工具索引](docs/production.md)。公开样音由 Fukujinzuke 录制，出自 Lingua Libre。[样音来源与许可](examples/speech/CREDITS.md)
+练习用的公开日语样音由 Fukujinzuke 录制，来自 Lingua Libre。[录音署名](examples/speech/CREDITS.md)

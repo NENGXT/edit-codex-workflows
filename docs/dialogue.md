@@ -1,17 +1,36 @@
-# 《桜乱》的一句台词，现场到底说了什么？
+# 《桜乱》｜从空白时间线到 150 条候选字幕
 
-中文 · [日本語](dialogue.ja.md) · [English](dialogue.en.md)
+中文 · [日本語](dialogue.ja.md) · [English](dialogue.en.md) · [返回首页](../README.md)
 
-先开声音。左边是飞书制作表「ACOPY」里的 7 月 19 日原片，右边是后来配过音的带水印审片。演员做同一个动作时，两版的声音差多少，听这几秒就知道。
+[播放 36 秒中文解说](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue.mp4) · [日本語版](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue-ja.mp4) · [English film](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue-en.mp4)
 
-![同一场戏的两版画面并排播放，左边为 ACOPY，右边为配音审片](../examples/films/dialogue-preview.gif)
+我想省下的是找句头、拖播放头、敲时间码的时间。识别结果一旦落到时间线上，我就可以谈具体镜头。遇到噪声、低语或模型写得通顺却跟表演对不上的词，还能随时调出那几秒的原声。
 
-[中文有声版 · 36 秒](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue.mp4) · [日本語版 · 36 秒](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue-ja.mp4)
+![制作原片与配音成片按同一动作对齐](../examples/films/dialogue-preview.gif)
 
-先听左边的 ACOPY，再听从它分出的人声，最后听右边成片的后期配音。三个镜头里，两边的动作和切镜对齐。第 18 秒进入字幕制作，依次看十集起稿、两份听写结果和我当时改回的一句台词。原片取自旧第 5 集的 27.0–31.8 秒，成片取自新版第 4 集的 32.8–37.6 秒。想单听从原片分离出的人声，可以[播放这段 4.8 秒的音轨](../examples/speech/review/acopy-voice.m4a)。
+**先听这 4.8 秒。** 画面左边是未处理的 ACOPY，右边是后来配过音的带水印审片。解说的前三段依次播放现场原声、从原声分离出的人声、后期配音。动作已经对齐。第三遍听到的清晰表演来自后期配音。[单听分离人声](../examples/speech/review/acopy-voice.m4a)
 
-**为什么我会用这套流程。** 一次拿到十集，让人从头听、倒回去找词，再一句句打时间码，光做出第一版字幕就很费神。我在对话里指定集数，让本机先按集听写；遇到环境声盖过台词，再把原声和单独提取的人声来回听。字幕压进画面后，我能直接看片，把时间留给有疑问的句子。
+## 一次制作到底处理多少
 
-**有些字，人声分出来也照样会听错。** 这次让同一个 Qwen 模型听前两轨，原片的句尾被写成「拷問あるか」，分离后写成「ごめんあるから」。回看制作时的另一份记录，8 月 25 日版的初稿写的是「ごめん、やるから」。我当时把它改回「手を貸せ。ご褒美やるから。」意思是“帮我一把，我会给你奖励”。两份识别结果见下方字幕文件。
+第 3–10 集涉及 7 个源文件，第 3、4 集已合并。下表取自各份**第一版候选稿**的交接记录，片长四舍五入到秒。候选稿包含识别、难句处理和整理。后来补词、并句时，条数也随之变化。
 
-[查看现场声听写](../examples/speech/review/acopy-asr.srt) · [查看分离人声听写](../examples/speech/review/acopy-voice-asr.srt) · [字幕技术手册](../models/README.md) · [当时的改稿对话](conversations.md#短剧字幕)
+| 源片 | 3+4 集 | 5 集 | 6 集 | 7 集 | 8 集 | 9 集 | 10 集 | 合计 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 片长 | 2:14 | 0:48 | 0:49 | 0:51 | 1:30 | 1:36 | 2:58 | 10:46 |
+| 首版候选字幕 | 29 | 10 | 12 | 16 | 9 | 19 | 55 | **150** |
+
+在第 3、4 集合并原片里，模型在开头约 7.8 秒连续写了「ん」，片尾又补了一句「ご視聴ありがとうございました」。现场声的人声检测和片尾画面都撑不起这两处。我把它们从候选稿里剔除，留下 29 条。
+
+[逐文件数据](../examples/speech/review/production.csv)
+
+## 我怎样带着对话改片
+
+1. **把整批片源铺到时间线上。** 我在对话里指定集数，让本机按文件跑 Whisper、写字幕、保留每句的起止时间。再让 FFmpeg 把 SRT 压进审片副本，看片就能发现字幕抢早、拖长或压到下一句。
+2. **把反复听整集，变成复听一个镜头。** 我从原片定位到 27.0–31.8 秒；另一版剪辑里，同一镜头是 32.8–37.6 秒。本次复演用 BS-RoFormer 分离现场声，让同一个 Qwen3-ASR 分别听两轨。原声给出「拷問あるか」，人声轨给出「ごめんあるから」。两种写法都解释不了角色为什么向对方要帮忙。[原声识别](../examples/speech/review/acopy-asr.srt) · [人声轨识别](../examples/speech/review/acopy-voice-asr.srt)
+3. **按角色的意思定词，把修订带回片子。** 制作时另一版初稿写成「ごめん、やるから」。我指出角色是在许诺奖励，定下「手を貸せ。ご褒美やるから。」随后把拆开的两条并成一句，检查相邻字幕，再看画面。分离轨帮我找到了要听的地方，人物关系决定了最后落哪几个字。[查看制作对话](conversations.md#短剧字幕)
+
+## 从按下运行到拿到文件
+
+为单独量出机器承担的工作，我重新取了 7 月 19 日版一份完整 ACOPY，长 **43.21 秒**。在 Apple M4 上用本地 Whisper large-v3，三次分别用 **10.192、10.629、9.873 秒**写成 SRT，文件内容完全相同。每份有 **10 条带起止时间的候选**。计时包括加载本地模型、解码、识别和写文件。此次单段起稿速度相当于片长的 **4.24 倍实时速度**；没有同期人工工时记录。
+
+9 月的制作统计用的是当时的剪辑版本。复测的 43.21 秒片源与上表 48 秒的第 5 集是不同剪辑。[三次计时与十段实际区间](../examples/speech/review/benchmark.json) · [模型、字幕和复现命令](../models/README.md)

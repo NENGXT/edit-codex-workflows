@@ -34,3 +34,22 @@ mlx-qwen3-asr examples/speech/thanks.wav --language Japanese \
 | 背景很响时 | BS-RoFormer（ep_317_sdr_12.9755）与 Demucs 分离人声，再对照原声。分离可能吃掉气声。 |
 
 工作中也用过 ASR API。本公开示例在本机完成，不需要向云服务提交录音。各模型沿用上游许可。
+
+## 实测一份完整 ACOPY
+
+同一份 43.209833 秒的日语原片，在 Apple M4 上用 MLX Whisper large-v3 写出 10 条 SRT。三次各用一个新 Python 进程，模型预先缓存在本机，解码温度为 0。计时从导入识别库到写完字幕，包含模型加载和媒体解码。三次输出文件逐字节一致，FFprobe 分别读出 10 个字幕包。制作时的降噪、分离、压片和人工审片另计。[运行记录和原始区间](../examples/speech/review/benchmark.json)
+
+在装有 FFmpeg 和 ffprobe 的 Apple Silicon Mac 上，准备已有权重的目录，再用自己的片源执行。以下在仓库根目录运行；每次选用新的输出文件名。
+
+```sh
+python3.13 -m venv .venv-whisper
+. .venv-whisper/bin/activate
+python -m pip install mlx-whisper==0.4.3
+python tools/benchmark_subtitles.py input.mp4 --model /path/to/whisper-large-v3-mlx --out first.srt
+```
+
+脚本打印素材时长、候选字幕条数和耗时。三次测试采用同一份权重，首次下载耗时不在计时范围内。技术源可查 [Whisper](https://github.com/openai/whisper)、[MLX Whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) 和 [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR)。
+
+## 三轨试听的音量
+
+先在同一段 4.8 秒内测量响度，再仅为展示副本设置固定增益。未处理原声保持原电平，分离人声加 2.0 dB，后期配音减 3.3 dB。对比时三轨约为 −22.4 LUFS，波形采用同一把纵轴。原版素材与识别输入保持原电平。[试听参数](../examples/speech/review/listening.json)
