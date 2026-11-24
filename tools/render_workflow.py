@@ -156,15 +156,14 @@ def edit_frame(sec, pitch_data):
     return im
 
 
-def render_edit(out, pitch_data):
-    silent=out/'edit.mp4'
+def render_slides(silent, shots, frame, poster=None):
     cmd=['ffmpeg','-hide_banner','-loglevel','error','-y','-f','rawvideo','-pix_fmt','rgb24','-s','960x540','-r',str(FPS),'-i','-','-an','-c:v','libx264','-preset','veryfast','-crf','19','-pix_fmt','yuv420p','-movflags','+faststart',str(silent)]
     proc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
     try:
-        for i in range(SHOT*len(EDIT_TITLES)*FPS):
-            im=edit_frame(i/FPS,pitch_data)
-            if i==int(2.8*FPS):
-                im.save(out/'edit.webp',quality=90)
+        for i in range(SHOT*shots*FPS):
+            im=frame(i/FPS)
+            if poster and i==int(2.8*FPS):
+                im.save(poster,quality=90)
             proc.stdin.write(im.tobytes())
     finally:
         proc.stdin.close()
@@ -173,49 +172,81 @@ def render_edit(out, pitch_data):
         raise RuntimeError('FFmpeg encoding failed')
 
 
-def render_dialogue(out, tmp, stem, final_label, captions):
-    # The two portrait frames already share an aligned 540 × 480 canvas.
-    headers = []
-    for stage, caption in enumerate(captions):
-        active = int(stage == 2)
-        header = Image.new('RGB', (540, 86), INK)
-        draw = ImageDraw.Draw(header)
-        for index, label in enumerate(('ACOPY', final_label)):
-            center = 135 + 270 * index
-            draw.text((center, 24), label, font=font(22), anchor='mm',
-                      fill=PAPER if active == index else MUTED)
-            if active == index:
-                right = center - draw.textlength(label, font=font(22)) / 2 - 9
-                x = round(right) - 17
-                draw.polygon([(x,21),(x+4,21),(x+9,16),(x+9,32),(x+4,27),(x,27)], fill=BLUE)
-                draw.arc((x+2,17,x+16,31), -48, 48, fill=BLUE, width=2)
-        draw.text((270, 62), caption, font=font(22), anchor='mm', fill=PAPER)
-        path = tmp / f'{stem}-{stage}.png'
-        header.save(path)
-        headers.append(path)
+DIALOGUE = {
+    'dialogue': {
+        'series': '短剧字幕', 'final': '成片',
+        'titles': ('听原声', '分出人声', '听成片', '十集，先出一稿', 'AI 听成了什么？', '我回听，改回台词'),
+        'captions': ('噪声盖住了这句台词的结尾。', '同一句，再听一次。', '这里听到的是后期配音。',
+                     '字幕压进画面，我边看边校。', '两次听写，都漏了「ご褒美」。', '「ご褒美」是“奖励”。'),
+        'steps': ('逐集听写', '难句复听', '压入字幕'),
+        'sources': ('原声', '分离人声'), 'revisions': ('字幕初稿', '校对后'),
+    },
+    'dialogue-ja': {
+        'series': '短編ドラマの字幕', 'final': '完成版',
+        'titles': ('元の音を聴く', '声を取り出す', '完成版を聴く', '全10話の字幕を起こす', 'AIにはどう聞こえた？', '聞き直して字幕を直す'),
+        'captions': ('雑音でセリフの語尾が聞き取りにくい。', '声だけで、同じセリフをもう一度。', '完成版ではアフレコに切り替わる。',
+                     '字幕を焼き込み、映像を見ながら確かめる。', 'どちらも「ご褒美」を聞き取れなかった。', '前後のやりとりも聞いて、言葉を確かめる。'),
+        'steps': ('各話を書き起こす', '難所を聞き直す', '字幕を焼き込む'),
+        'sources': ('元の音声', '分離した声'), 'revisions': ('字幕の初稿', '修正後'),
+    },
+}
 
-    # Play the same 4.8-second passage three times. Pad to five seconds so
-    # the cut, the active speaker and the web chapter change together.
+
+def dialogue_frame(sec, copy):
+    part = int(sec // SHOT)
+    elapsed = sec % SHOT
+    image = Image.new('RGB', (W, H), INK)
+    draw = ImageDraw.Draw(image)
+    text(draw, 42, 32, f"{copy['series']}   /   {part + 1:02}", 22, BLUE)
+    text(draw, 42, 180 if part < 3 else 83, copy['titles'][part], 45)
+    if part < 3:
+        color = ORANGE if part == 2 else BLUE
+        text(draw, 484, 38, 'ACOPY', 24, MUTED if part == 2 else BLUE)
+        text(draw, 700, 38, copy['final'], 24, ORANGE if part == 2 else MUTED)
+        draw.line((46, 280, 380, 280), fill='#4c5667', width=3)
+        draw.line((46, 280, 46 + 334 * min(elapsed / 4.8, 1), 280), fill=color, width=4)
+    elif part == 3:
+        for i, (label, tool) in enumerate(zip(copy['steps'], ('Whisper', 'BS-RoFormer / Qwen3-ASR', 'FFmpeg'))):
+            y = 181 + i * 80
+            text(draw, 46, y, label, 31, PAPER if elapsed >= i*.8 else MUTED)
+            text(draw, 455, y, tool, 29, BLUE if elapsed >= i*.8 else MUTED)
+    elif part == 4:
+        for i, (label, result) in enumerate(zip(copy['sources'], ('拷問あるか', 'ごめんあるから'))):
+            y = 210 + i * 95
+            text(draw, 46, y, label, 28, MUTED)
+            text(draw, 420, y, result, 38, PAPER if elapsed >= i*.8 else MUTED)
+    else:
+        text(draw, 46, 190, copy['revisions'][0], 24, MUTED)
+        text(draw, 46, 230, 'ごめん、やるから', 36, MUTED)
+        if elapsed >= .8:
+            text(draw, 46, 310, copy['revisions'][1], 24, ORANGE)
+            text(draw, 46, 350, '手を貸せ。ご褒美やるから。', 44)
+    draw.line((42, 452, 918, 452), fill='#747c82', width=1)
+    text(draw, 44, 476, copy['captions'][part], 26)
+    return image
+
+
+def render_dialogue(out, tmp, stem, copy):
+    silent = tmp / 'slides.mp4'
+    render_slides(silent, len(copy['titles']), lambda sec: dialogue_frame(sec, copy))
+    # The same two shots stay in sync through the three listening passes.
     layout = (
-        '[0:v]fps=24,tpad=stop_mode=clone:stop_duration=1,trim=end_frame=120,'
-        'loop=loop=2:size=120:start=0,setpts=N/(24*TB),pad=540:566:0:86[v];'
-        '[v][3:v]overlay=0:0[first];'
-        "[first][4:v]overlay=0:0:enable='gte(t,5)'[second];"
-        "[second][5:v]overlay=0:0:enable='gte(t,10)'[video];"
-        '[0:a]aresample=48000,atrim=end=4.8,apad,atrim=end=5,asetpts=PTS-STARTPTS[raw];'
-        '[1:a]aresample=48000,atrim=end=4.8,apad,atrim=end=5,asetpts=PTS-STARTPTS[final];'
-        '[2:a]aresample=48000,atrim=end=4.8,apad,atrim=end=5,asetpts=PTS-STARTPTS[voice];'
-        '[raw][voice][final]concat=n=3:v=0:a=1[audio]'
+        '[1:v]fps=24,scale=432:384,setsar=1,tpad=stop_mode=clone:stop_duration=2,'
+        'trim=end_frame=144,loop=loop=2:size=144:start=0,setpts=N/(24*TB)[pair];'
+        "[0:v][pair]overlay=484:68:enable='lt(t,18)':eof_action=pass[video];"
+        '[1:a]aresample=48000,atrim=end=4.8,apad,atrim=end=6,asetpts=PTS-STARTPTS[raw];'
+        '[2:a]aresample=48000,atrim=end=4.8,apad,atrim=end=6,asetpts=PTS-STARTPTS[voice];'
+        '[3:a]aresample=48000,atrim=end=4.8,apad,atrim=end=6,asetpts=PTS-STARTPTS[dub];'
+        '[raw][voice][dub]concat=n=3:v=0:a=1,apad[audio]'
     )
     movie = out / f'{stem}.mp4'
-    subprocess.run(['ffmpeg','-v','error','-y','-i',str(REVIEW/'comparison.mp4'),
-                    '-i',str(REVIEW/'scene.mp4'),'-i',str(REVIEW/'acopy-voice.m4a'),
-                    '-i',str(headers[0]),'-i',str(headers[1]),'-i',str(headers[2]),
-                    '-filter_complex',layout,'-map','[video]','-map','[audio]','-t','15',
+    subprocess.run(['ffmpeg','-v','error','-y','-i',str(silent),'-i',str(REVIEW/'comparison.mp4'),
+                    '-i',str(REVIEW/'acopy-voice.m4a'),'-i',str(REVIEW/'scene.mp4'),
+                    '-filter_complex',layout,'-map','[video]','-map','[audio]','-t',str(SHOT * len(copy['titles'])),
                     '-c:v','libx264','-crf','18','-pix_fmt','yuv420p','-c:a','aac',
                     '-b:a','160k','-movflags','+faststart',str(movie)],check=True)
-    still = tmp / f'{stem}-poster.png'
-    subprocess.run(['ffmpeg','-v','error','-y','-ss','1','-i',str(movie),
+    still = tmp / 'poster.png'
+    subprocess.run(['ffmpeg','-v','error','-y','-ss','3.8','-i',str(movie),
                     '-frames:v','1',str(still)],check=True)
     with Image.open(still) as poster:
         poster.save(out / f'{stem}.webp', quality=90)
@@ -232,14 +263,7 @@ if __name__=='__main__':
     cover(peaks).save(args.output/'cover.webp',quality=93)
     pitch_data=json.loads((ROOT/'examples/edit/intonation.json').read_text())
     with tempfile.TemporaryDirectory() as tmp:
-        render_dialogue(args.output, Path(tmp), 'dialogue', '成片', (
-            '杂音盖住了句尾。你听得清吗？',
-            '分出人声，AI 先听写，我再逐句校对。',
-            '同一句台词，听听后期配音。',
-        ))
-        render_dialogue(args.output, Path(tmp), 'dialogue-ja', '完成版', (
-            '雑音に埋もれた語尾、聞き取れますか？',
-            '声を分離し、AIの書き起こしを耳で確かめる。',
-            '同じセリフを、今度はアフレコで。',
-        ))
-    render_edit(args.output, pitch_data)
+        for stem, copy in DIALOGUE.items():
+            render_dialogue(args.output, Path(tmp), stem, copy)
+    render_slides(args.output/'edit.mp4', len(EDIT_TITLES),
+                  lambda sec: edit_frame(sec, pitch_data), args.output/'edit.webp')

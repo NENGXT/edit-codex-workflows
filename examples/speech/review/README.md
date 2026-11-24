@@ -6,7 +6,7 @@
 | --- | --- |
 | [comparison.mp4](comparison.mp4) | 左侧 ACOPY、右侧配音版，音轨使用左边原片的现场声。 |
 | [acopy-voice.m4a](acopy-voice.m4a) | 从 ACOPY 的 24–35 秒分出人声，再截取对应的 4.8 秒。 |
-| [scene.mp4](scene.mp4) | 带原水印的后期配音版，供后五秒试听。 |
+| [scene.mp4](scene.mp4) | 带原水印的后期配音版，用于第 12 秒开始的成片试听。 |
 | [现场声听写](acopy-asr.srt) · [分离人声听写](acopy-voice-asr.srt) | 两轨分别送入同一本地 Qwen3-ASR 与对齐器的输出，保留了误听。时间码相对节选开头。 |
 
 此前在配音版上做过另一次测试，其[分离结果](voice.m4a)和[字幕](line.srt)仍可查阅。演示依次播放 ACOPY 原声、从中分离的人声和成片的后期配音。
