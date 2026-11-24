@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.DS_Store
+out/
+.env*
+*.safetensors
+*.ckpt
+*.pth
+.venv-asr/

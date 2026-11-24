@@ -1,0 +1,11 @@
+{
+  "reference": "/kaggle/input/PRIVATE-DATASET/reference.wav",
+  "reference_sha256": "REPLACE_WITH_REFERENCE_SHA256",
+  "reference_use_approved": false,
+  "prompt_text": "填写参考音频实际说出的文字",
+  "prompt_language": "all_zh",
+  "items": [
+    {"id": "line_001", "text": "填写第一条要合成的正文。", "language": "all_zh"},
+    {"id": "line_002", "text": "填写第二条要合成的正文。", "language": "all_zh"}
+  ]
+}
