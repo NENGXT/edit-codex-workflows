@@ -1,5 +1,9 @@
 # 广告剪辑 · 从第一次看片到三种画幅
 
+中文 · [日本語](edit.ja.md) · [English](edit.en.md)
+
+[播放开场评论对比 · 4 秒，无声](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/comment-comparison.mp4)
+
 ![同一条开场评论在 V3 和 V4 竖版里的真实画面对照](../examples/edit/comment-revision.gif)
 
 **先看上面的评论框。** 同一段开场，V3 跟着演员一行一行换，看完最后一句就看不到第一句。返修时，我让 Codex 在 ChatCut 里把开头改回一张完整的评论卡。V4 弹出来就能读完三行，后面的对白字幕仍然一次一行。动图取自两次竖版导出的相同时间，只截取开头的评论区域。

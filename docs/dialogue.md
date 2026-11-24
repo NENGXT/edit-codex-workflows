@@ -1,5 +1,7 @@
 # 《桜乱》的一句台词，现场到底说了什么？
 
+中文 · [日本語](dialogue.ja.md) · [English](dialogue.en.md)
+
 先开声音。左边是飞书制作表「ACOPY」里的 7 月 19 日原片，右边是后来配过音的带水印审片。演员做同一个动作时，两版的声音差多少，听这几秒就知道。
 
 ![同一场戏的两版画面并排播放，左边为 ACOPY，右边为配音审片](../examples/films/dialogue-preview.gif)
