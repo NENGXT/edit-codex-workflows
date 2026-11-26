@@ -4,13 +4,20 @@
 
 ![A location-sound waveform, two versions of the same shot, and the revised game-ad comment](examples/films/cover.webp)
 
-Ten minutes of Japanese drama can mean finding the start and end of more than a hundred subtitle cues. I built a workflow in Codex for the repeated work of locating speech, drafting text and laying it on a timeline. These two case studies follow the material through actual edits and measurements.
+This is my edit log for a Japanese drama and a game ad. On *Sakura Ran*, I used Codex to turn a batch of location recordings into timed subtitles, then pulled up just the word endings I needed to hear again. On the ad, I picked the frame where the actor should react and used Codex to adjust the cut and measure the sound against the exported picture.
+
+### Start with the two 36-second films
+
+- [Drama](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue-en.mp4) · Listen to one line on location, with the voice isolated, and in the later studio dub.
+- [Game ad](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit-en.mp4) · Compare the same opening frame. In one cut you can read a single comment line. In the next you can read the whole question.
+
+For the instructions I gave and what I changed after each pass, read [the edit session](docs/conversations.en.md).
 
 ### Drama | From location recordings to an editable subtitle track
 
 For episodes 3–10 of *Sakura Ran* (桜乱), seven source files covered **10 min 46 s and yielded 150 draft cues**. I ran transcription, segmentation and timing locally. When a voice disappeared under location noise, I lined up two tracks at the same cut. The editor could jump to that line and change its wording or timing.
 
-I also repeated the draft stage on a separate **43.21 s** ACOPY source. On an Apple M4, three fresh runs each wrote the same ten timed cues, in a median of **10.19 s**. [Watch the 36-second English film](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue-en.mp4) · [Compare the recordings](docs/dialogue.en.md) · [Production counts](examples/speech/review/production.csv) · [Timing results](examples/speech/review/benchmark.json)
+I also repeated the draft stage on a separate **43.21 s** ACOPY source. On an Apple M4, three fresh runs each wrote the same ten timed cues, in a median of **10.19 s**. [Compare the recordings](docs/dialogue.en.md) · [Production counts](examples/speech/review/production.csv) · [Timing results](examples/speech/review/benchmark.json)
 
 ### Advertising | Turning “that reaction comes too early” into a cut
 
@@ -18,7 +25,7 @@ In a *Whiteout Survival* ad the machine is still blocked at 42.83 s. Its first i
 
 ![The same opening comment in V3 and V4. V3 replaces each line as it is read. V4 shows the whole question at once.](examples/edit/comment-revision.gif)
 
-A separate ad needed a Japanese voice pickup. With permission to clone the speaker’s voice, I auditioned different deliveries of the same line. For one revision I asked to flatten just the opening of an 8.48 s take. Its final **6.32 s matched the previous take sample for sample**. [Watch the 36-second English film](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit-en.mp4) · [See the edit and voice decisions](docs/edit.en.md)
+A separate ad needed a Japanese voice pickup. With permission to clone the speaker’s voice, I auditioned different deliveries of the same line. For one revision I asked to flatten just the opening of an 8.48 s take. Its final **6.32 s matched the previous take sample for sample**. [See the edit and voice decisions](docs/edit.en.md)
 
 ### Follow the work
 

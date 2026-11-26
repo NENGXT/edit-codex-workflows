@@ -4,13 +4,20 @@
 
 ![对白与剪辑。现场声波、短剧的同帧对照，以及游戏广告改过的评论卡。](examples/films/cover.webp)
 
-做日语短剧，十来分钟素材也能拆出上百处对白。最花时间的是来回倒片、找每一句的头尾，再把它放进剪辑时间线。我在 Codex 里把这些动作接了起来。下面两个案例都有实际用过的素材、修改前后和测量记录。
+我把两次剪辑工作里和 Codex 来回修改的过程放在这里。做《桜乱》时，我让它把一批现场录音变成带时间码的字幕，再把听不清的句尾单独拿出来比对。剪游戏广告时，我先在画面里定下演员该在哪一帧回应，再让它调整时间线，量一遍导出后的声画偏移。
+
+### 先看两段，各 36 秒
+
+- [短剧](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue.mp4) · 听同一句的现场原声、分离人声和后期配音。
+- [游戏广告](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit.mp4) · 看同一帧里，观众能读到一行评论还是整条问题。
+
+想看我怎么下指令、哪一版被我改掉，可以直接读[逐轮制作记录](docs/conversations.md)。
 
 ### 短剧｜从一批现场录音，到剪辑师能用的字幕轨
 
 《桜乱》第 3–10 集的 7 份原片，合计 **10 分 46 秒、150 条候选字幕**。我先让本机按集听写、切句、打时间码。遇到收音差的段落，我留下原声，另分一轨人声，再把两份听写放回同一镜头。剪辑师可以点到争议的那一句，直接改词和入点。
 
-**单段测速**取了另一份 43.21 秒的未处理 ACOPY。在 Apple M4 上，三次独立运行都写出相同的 10 条 SRT，中位用时 **10.19 秒**。[看 36 秒有声解说](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/dialogue.mp4) · [按镜头听对比](docs/dialogue.md) · [逐集数量](examples/speech/review/production.csv) · [三次实测](examples/speech/review/benchmark.json)
+**单段测速**取了另一份 43.21 秒的未处理 ACOPY。在 Apple M4 上，三次独立运行都写出相同的 10 条 SRT，中位用时 **10.19 秒**。[按镜头听对比](docs/dialogue.md) · [逐集数量](examples/speech/review/production.csv) · [三次实测](examples/speech/review/benchmark.json)
 
 ### 广告｜从「这一句接早了」，到一个可以复查的剪点
 
@@ -18,7 +25,7 @@
 
 ![同一帧的两张评论卡。V3 只显示演员正在读的一行；V4 在开头就展示完整问题。](examples/edit/comment-revision.gif)
 
-另一个广告缺录了一句日语。我用获准的参考录音做克隆试听，让同一句分别按两种语气来读。后来我只想把开头念平一点。两份 8.48 秒的试听从 2.16 秒起，后面 **6.32 秒逐采样一致**。[看 36 秒剪辑与补声解说](https://github.com/NENGXT/edit-codex-workflows/raw/refs/heads/main/examples/films/edit.mp4) · [看剪点和试听数据](docs/edit.md)
+另一个广告缺录了一句日语。我用获准的参考录音做克隆试听，让同一句分别按两种语气来读。后来我只想把开头念平一点。两份 8.48 秒的试听从 2.16 秒起，后面 **6.32 秒逐采样一致**。[看剪点和试听数据](docs/edit.md)
 
 ### 看我是怎么一轮轮做的
 
